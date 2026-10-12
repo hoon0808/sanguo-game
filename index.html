@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2e2415">
+<title>천하쟁패 삼국지</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/mobile.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/app/icon-192.png">
+<link rel="apple-touch-icon" href="img/app/icon-180.png">
+<meta name="apple-mobile-web-app-title" content="천하쟁패">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="js/data/cities.js"></script>
+<script src="js/data/geo.js"></script>
+<script src="js/data/landmask.js"></script>
+<script src="js/data/officers.js"></script>
+<script src="js/data/scenarios.js"></script>
+<script src="js/core/util.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/troops.js"></script>
+<script src="js/core/rules.js"></script>
+<script src="js/core/battle.js"></script>
+<script src="js/core/ai.js"></script>
+<script src="js/core/turn.js"></script>
+<script src="js/core/tactics.js"></script>
+<script src="js/core/diplomacy.js"></script>
+<script src="js/core/events.js"></script>
+<script src="js/core/visits.js"></script>
+<script src="js/ui/common.js"></script>
+<script src="js/ui/mobile.js"></script>
+<script src="js/ui/icons.js"></script>
+<script src="js/ui/audio.js"></script>
+<script src="js/ui/map.js"></script>
+<script src="js/ui/panel.js"></script>
+<script src="js/ui/commands.js"></script>
+<script src="js/ui/battle.js"></script>
+<script src="js/ui/schemes.js"></script>
+<script src="js/ui/screens.js"></script>
+<script src="js/ui/main.js"></script>
+<script src="js/ui/visit.js"></script>
+<script src="js/ui/fieldscene.js"></script>
+<script src="js/ui/cmdscene.js"></script>
+<script>
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>

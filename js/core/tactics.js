@@ -1,0 +1,437 @@
+// 직접 지휘 전투 (육각형 칸). 화면 없이 돌아가는 규칙 + 컴퓨터 지휘.
+// 하루 = 공격군 차례 → 수비군 차례. 30일 안에 본성(本城)을 차지하거나 수비군을 모두 물리치면 공격군 승리.
+var SG = SG || {};
+SG.T = {};
+
+SG.T.COLS = 16;
+SG.T.ROWS = 11;
+SG.T.DAYS = 30;
+SG.T.CASTLE = { c: 13, r: 5 };
+SG.T.TERRAIN = {
+  plain: { n: '평지', cost: 1, def: 1.0 },
+  forest: { n: '숲', cost: 2, def: 1.15 },
+  hill: { n: '언덕', cost: 2, def: 1.2 },
+  mountain: { n: '산', cost: 3, def: 1.3 },
+  water: { n: '강', cost: 3, def: 0.8 },
+  wall: { n: '성벽', cost: 99, def: 1 },
+  gate: { n: '성문', cost: 1, def: 1.35 },
+  castle: { n: '성 안', cost: 1, def: 1.4 },
+  keep: { n: '본성', cost: 1, def: 1.5 }
+};
+
+// ---- 육각형 좌표 (홀수 줄 오른쪽으로 밀림)
+SG.T.key = function (c, r) { return c + ',' + r; };
+SG.T.inside = function (c, r) { return c >= 0 && r >= 0 && c < SG.T.COLS && r < SG.T.ROWS; };
+SG.T.neighbors = function (c, r) {
+  var d = (r & 1) ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]] : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
+  var out = [];
+  d.forEach(function (x) { var nc = c + x[0], nr = r + x[1]; if (SG.T.inside(nc, nr)) out.push([nc, nr]); });
+  return out;
+};
+SG.T.cube = function (c, r) { var x = c - (r - (r & 1)) / 2; return [x, -x - r, r]; };
+SG.T.dist = function (a, b) {
+  var p = SG.T.cube(a[0], a[1]), q = SG.T.cube(b[0], b[1]);
+  return Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]), Math.abs(p[2] - q[2]));
+};
+
+// 도시마다 항상 같은 전장이 나오도록 도시 이름으로 만든 난수
+function localRng(str) {
+  var s = 2166136261;
+  for (var i = 0; i < str.length; i++) { s ^= str.charCodeAt(i); s = Math.imul(s, 16777619) >>> 0; }
+  return function () {
+    s = (s + 0x6D2B79F5) >>> 0;
+    var t = Math.imul(s ^ (s >>> 15), s | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+SG.T.makeMap = function (cid) {
+  var C = SG.CITIES[cid], rnd = localRng(cid), T = SG.T, map = {};
+  var kind = C.terrain;
+  for (var r = 0; r < T.ROWS; r++) for (var c = 0; c < T.COLS; c++) map[T.key(c, r)] = 'plain';
+  function blob(type, n, minC, maxC) {
+    for (var i = 0; i < n; i++) {
+      var c0 = minC + Math.floor(rnd() * (maxC - minC)), r0 = Math.floor(rnd() * T.ROWS);
+      map[T.key(c0, r0)] = type;
+      T.neighbors(c0, r0).forEach(function (nb) { if (rnd() < 0.55) map[T.key(nb[0], nb[1])] = type; });
+    }
+  }
+  if (kind === 'plain') { blob('forest', 4, 2, 11); blob('hill', 2, 3, 10); }
+  if (kind === 'hill') { blob('hill', 7, 2, 11); blob('forest', 3, 2, 11); }
+  if (kind === 'mountain') { blob('mountain', 7, 2, 11); blob('forest', 4, 2, 11); blob('hill', 2, 2, 10); }
+  if (kind === 'river') {
+    blob('forest', 2, 2, 11);
+    var col = 6 + Math.floor(rnd() * 2);
+    var fords = [Math.floor(rnd() * 3) + 1, Math.floor(rnd() * 3) + 7];
+    for (var rr = 0; rr < T.ROWS; rr++) {
+      var cc = col + ((rr % 4 === 1 || rr % 4 === 2) ? 1 : 0);
+      map[T.key(cc, rr)] = fords.indexOf(rr) >= 0 ? 'plain' : 'water';
+    }
+  }
+  // 성: 본성 + 성 안(거리 1) + 성벽(거리 2, 서쪽 성문 3곳)
+  var K = [T.CASTLE.c, T.CASTLE.r];
+  for (var r2 = 0; r2 < T.ROWS; r2++) for (var c2 = 0; c2 < T.COLS; c2++) {
+    var d = T.dist([c2, r2], K);
+    if (d === 0) map[T.key(c2, r2)] = 'keep';
+    else if (d === 1) map[T.key(c2, r2)] = 'castle';
+    else if (d === 2) map[T.key(c2, r2)] = 'wall';
+    else if (d === 3 && map[T.key(c2, r2)] === 'water') map[T.key(c2, r2)] = 'plain';
+  }
+  // 성문: 성벽 중 가장 서쪽 3칸 (가운데, 위, 아래)
+  var gates = [[K[0] - 2, K[1]], [K[0] - 1, K[1] - 2], [K[0] - 1, K[1] + 2]];
+  gates.forEach(function (g) { map[T.key(g[0], g[1])] = 'gate'; });
+  // 공격군 출발지는 평지
+  for (var r3 = 0; r3 < T.ROWS; r3++) { map[T.key(0, r3)] = 'plain'; map[T.key(1, r3)] = 'plain'; }
+  return map;
+};
+
+// ---- 전투 만들기
+SG.T.create = function (atk, def) {
+  var T = SG.T, t = SG.S.cities[def.city];
+  var B = { atk: atk, def: def, city: def.city, map: T.makeMap(def.city), units: [], day: 1, side: 'atk', log: [], over: null,
+    morale: { atk: atk.morale, def: def.morale }, train: { atk: atk.train, def: def.train }, captured: [], killed: [], seq: 0 };
+  // 수비 장수가 많으면 8명만 성에 나가고 나머지 병사는 나눠 맡는다
+  var dUnits = def.units.slice().sort(function (a, b) { return (b.oid ? SG.O(b.oid).lead : 0) - (a.oid ? SG.O(a.oid).lead : 0); });
+  var field = dUnits.slice(0, 8), reserve = dUnits.slice(8);
+  var extra = reserve.reduce(function (s, u) { return s + u.n; }, 0);
+  reserve.forEach(function (u) { u.n = 0; u.reserve = true; });
+  field.forEach(function (u, i) { u.n += Math.floor(extra / field.length) + (i === 0 ? extra % field.length : 0); u.max = u.n; });
+  var aSpots = [5, 3, 7, 1, 9].map(function (r) { return [r % 2 === 0 ? 1 : 0, r]; });
+  atk.units.forEach(function (u, i) { B.units.push(T.unit(B, u, 'atk', aSpots[i][0], aSpots[i][1])); });
+  var K = T.CASTLE;
+  var dSpots = [[K.c, K.r]].concat(T.neighbors(K.c, K.r)).concat([[K.c - 2, K.r], [K.c - 1, K.r - 2], [K.c - 1, K.r + 2]]);
+  dSpots.sort(function (a, b) { return a[0] - b[0]; });
+  dSpots = [[K.c, K.r]].concat(dSpots.filter(function (p) { return !(p[0] === K.c && p[1] === K.r); }));
+  field.forEach(function (u, i) { if (u.n > 0 || !u.oid) B.units.push(T.unit(B, u, 'def', dSpots[i][0], dSpots[i][1])); });
+  B.wallBonus = 1 + 0.3 * t.wall / SG.CITY_SIZE[SG.CITIES[def.city].size].wallMax;
+  return B;
+};
+SG.T.unit = function (B, ref, side, c, r) {
+  var o = ref.oid ? SG.O(ref.oid) : { lead: 30, war: 30, int: 20, sk: null, n: '수비병' };
+  return { id: ++B.seq, ref: ref, oid: ref.oid, side: side, c: c, r: r, n: ref.n, max: ref.n, done: false, conf: 0, t: ref.t || 'inf',
+    lead: o.lead, war: o.war, int: o.int, sk: o.sk, name: ref.oid ? SG.name(ref.oid) : '수비병' };
+};
+SG.T.at = function (B, c, r) {
+  for (var i = 0; i < B.units.length; i++) { var u = B.units[i]; if (u.n > 0 && u.c === c && u.r === r) return u; }
+  return null;
+};
+SG.T.alive = function (B, side) { return B.units.filter(function (u) { return u.n > 0 && (!side || u.side === side); }); };
+SG.T.terr = function (B, c, r) { return SG.T.TERRAIN[B.map[SG.T.key(c, r)]]; };
+SG.T.moveCost = function (B, u, c, r) {
+  var tt = B.map[SG.T.key(c, r)];
+  if (tt === 'wall') return 99;
+  if ((tt === 'gate' || tt === 'castle' || tt === 'keep') && u.side === 'atk') {
+    // 성문을 지나야 성 안에 들어갈 수 있다 (성벽은 막힘). 성 안 이동은 보통.
+    return 1;
+  }
+  if (tt === 'water' && u.sk === '수군') return 1;
+  // 기병은 숲·언덕·산·강에서 한 칸 더 힘들다
+  if (u.t === 'cav' && (tt === 'forest' || tt === 'hill' || tt === 'mountain' || tt === 'water')) return SG.T.TERRAIN[tt].cost + 1;
+  return SG.T.TERRAIN[tt].cost;
+};
+SG.T.movePoints = function (u) { return 4 + (u.t === 'cav' ? 2 : 0) + (u.sk === '기마' ? 1 : 0); };
+SG.T.enemyAdj = function (B, u, c, r) {
+  return SG.T.neighbors(c, r).some(function (nb) { var x = SG.T.at(B, nb[0], nb[1]); return x && x.side !== u.side; });
+};
+
+// 갈 수 있는 칸: {key: 남은 이동력}. 적과 맞닿은 칸에 들어가면 멈춘다.
+SG.T.reachable = function (B, u) {
+  var T = SG.T, best = {}, q = [[u.c, u.r, T.movePoints(u)]];
+  best[T.key(u.c, u.r)] = T.movePoints(u);
+  while (q.length) {
+    q.sort(function (a, b) { return b[2] - a[2]; });
+    var cur = q.shift();
+    if (cur[2] <= 0) continue;
+    if (!(cur[0] === u.c && cur[1] === u.r) && T.enemyAdj(B, u, cur[0], cur[1])) continue;
+    T.neighbors(cur[0], cur[1]).forEach(function (nb) {
+      var occ = T.at(B, nb[0], nb[1]);
+      if (occ && occ !== u) {
+        if (occ.side !== u.side) return;
+      }
+      var cost = T.moveCost(B, u, nb[0], nb[1]);
+      var left = cur[2] - cost;
+      if (cost >= 99) return;
+      if (left < 0) { if (cur[2] === T.movePoints(u) && cost < 99) left = 0; else return; } // 한 칸은 늘 갈 수 있다
+      var k = T.key(nb[0], nb[1]);
+      if (best[k] === undefined || best[k] < left) { best[k] = left; q.push([nb[0], nb[1], left]); }
+    });
+  }
+  // 아군이 있는 칸에는 멈출 수 없다
+  Object.keys(best).forEach(function (k) {
+    var p = k.split(',').map(Number), occ = T.at(B, p[0], p[1]);
+    if (occ && occ !== u) delete best[k];
+  });
+  return best;
+};
+
+SG.T.move = function (B, u, c, r) {
+  var k = SG.T.key(c, r);
+  var reach = SG.T.reachable(B, u);
+  if (reach[k] === undefined) return false;
+  u.c = c; u.r = r; u.moved = true;
+  SG.T.checkEnd(B);
+  return true;
+};
+
+// ---- 공격
+SG.T.range = function (u) { return (u.t === 'arc' ? 2 : 1) + (u.sk === '궁신' ? 1 : 0); };
+SG.T.attackTargets = function (B, u) {
+  return SG.T.alive(B).filter(function (x) { return x.side !== u.side && SG.T.dist([u.c, u.r], [x.c, x.r]) <= SG.T.range(u); });
+};
+SG.T.damage = function (B, a, d, mult) {
+  var aStat = a.war * 0.6 + a.lead * 0.4 + (a.sk === '무쌍' ? 8 : 0);
+  var dStat = d.lead * 0.6 + d.war * 0.4;
+  var ratio = SG.clamp((aStat + 20) / (dStat + 20), 0.5, 2);
+  var tr = B.train[a.side], mo = B.morale[a.side];
+  var dmg = a.n * 0.12 * ratio * (0.6 + tr / 250) * (0.6 + mo / 250) * (mult || 1);
+  if (a.sk === '돌격') dmg *= 1.15;
+  // 병종: 상성, 잘 다루는 병종, 기병 돌격(움직인 뒤 공격), 성 안을 치는 기병은 약함, 성 위 궁병은 강함
+  dmg *= SG.match(a.t, d.t);
+  if (a.oid && SG.apt(a.oid) === a.t) dmg *= SG.APT_BONUS;
+  var at = B.map[SG.T.key(a.c, a.r)], tt = B.map[SG.T.key(d.c, d.r)];
+  var inCastle = function (x) { return x === 'gate' || x === 'castle' || x === 'keep'; };
+  if (a.t === 'cav' && a.moved) dmg *= 1.15;
+  if (a.t === 'cav' && inCastle(tt) && d.side === 'def') dmg *= 0.75;
+  if (a.t === 'arc' && a.side === 'def' && inCastle(at)) dmg *= 1.15;
+  var td = SG.T.TERRAIN[tt].def;
+  if (tt === 'water' && d.sk === '수군') td = 1.1;
+  if (d.side === 'def' && (tt === 'gate' || tt === 'castle' || tt === 'keep')) td *= B.wallBonus;
+  if (d.sk === '철벽') td *= 1.2;
+  dmg = dmg / td * SG.randf(0.85, 1.15);
+  return Math.max(10, Math.round(dmg));
+};
+SG.T.hit = function (B, d, dmg) {
+  dmg = Math.min(d.n, dmg);
+  d.n -= dmg;
+  if (d.n <= 0) SG.T.broken(B, d);
+  return dmg;
+};
+SG.T.attack = function (B, a, d) {
+  var dist = SG.T.dist([a.c, a.r], [d.c, d.r]);
+  var ranged = dist > 1;
+  var dmg = SG.T.hit(B, d, SG.T.damage(B, a, d, ranged ? (a.t === 'arc' ? 0.85 : 0.7) : 1));
+  var msg = a.name + '이(가) ' + d.name + '을(를) ' + (ranged ? '활로 쏘았다' : '공격했다') + ' (-' + SG.fmt(dmg) + ')';
+  if (d.n > 0 && !ranged && d.conf <= 0) {
+    var back = SG.T.hit(B, a, Math.round(SG.T.damage(B, d, a, d.t === 'arc' ? 0.35 : 0.5)));
+    msg += ', 반격 -' + SG.fmt(back);
+  }
+  if (d.n <= 0) msg += ' — ' + d.name + ' 부대 궤멸!';
+  B.log.push(msg);
+  a.done = true;
+  SG.T.moraleShift(B, a.side, d.n <= 0 ? 4 : 1);
+  SG.T.checkEnd(B);
+  return msg;
+};
+SG.T.moraleShift = function (B, side, v) {
+  var other = side === 'atk' ? 'def' : 'atk';
+  B.morale[side] = SG.clamp(B.morale[side] + v, 0, 100);
+  B.morale[other] = SG.clamp(B.morale[other] - v, 0, 100);
+};
+SG.T.broken = function (B, u) {
+  u.n = 0;
+  if (u.oid && SG.chance(0.35)) {
+    B.captured.push({ oid: u.oid, by: u.side === 'atk' ? 'def' : 'atk' });
+    u.ref.oidLost = u.oid; u.ref.oid = null; u.ref.out = true;
+    B.log.push('  ' + u.name + '이(가) 사로잡혔다!');
+  }
+};
+
+// ---- 계략 (화계·혼란): 2칸 안의 적
+SG.T.STRATS = { fire: '화계', confuse: '혼란' };
+SG.T.stratTargets = function (B, u) {
+  return SG.T.alive(B).filter(function (x) { return x.side !== u.side && SG.T.dist([u.c, u.r], [x.c, x.r]) <= 2; });
+};
+SG.T.stratChance = function (B, u, t, kind) {
+  var p = 0.5 + (u.int - t.int) / 90;
+  if (u.sk === '신산') p += 0.15;
+  if (kind === 'fire' && B.map[SG.T.key(t.c, t.r)] === 'water') p -= 0.3;
+  if (kind === 'fire' && B.map[SG.T.key(t.c, t.r)] === 'forest') p += 0.1;
+  return SG.clamp(p, 0.05, 0.92);
+};
+SG.T.strategy = function (B, u, t, kind) {
+  var p = SG.T.stratChance(B, u, t, kind), msg;
+  if (SG.chance(p)) {
+    if (kind === 'fire') {
+      var dmg = SG.T.hit(B, t, Math.round(t.n * SG.randf(0.1, 0.18) * (u.sk === '신산' ? 1.3 : 1) + u.int * 6));
+      msg = u.name + '의 화계! ' + t.name + ' 부대가 불길에 휩싸였다 (-' + SG.fmt(dmg) + ')' + (t.n <= 0 ? ' — 궤멸!' : '');
+      SG.T.moraleShift(B, u.side, 2);
+    } else {
+      t.conf = 2;
+      msg = u.name + '의 계략에 ' + t.name + ' 부대가 혼란에 빠졌다! (2일 동안 움직일 수 없음)';
+    }
+  } else msg = u.name + '의 ' + SG.T.STRATS[kind] + '이(가) ' + t.name + '에게 간파당했다.';
+  B.log.push(msg);
+  u.done = true;
+  SG.T.checkEnd(B);
+  return msg;
+};
+
+// ---- 일기토: 붙어 있는 적 장수에게 신청
+SG.T.duelTargets = function (B, u) {
+  if (!u.oid) return [];
+  return SG.T.alive(B).filter(function (x) { return x.side !== u.side && x.oid && SG.T.dist([u.c, u.r], [x.c, x.r]) === 1; });
+};
+// 상대가 받아들이는지 (컴퓨터 판단)
+SG.T.duelAccept = function (B, challenger, target) {
+  var p = SG.duelWinChance(target.oid, challenger.oid);
+  return p > 0.4 || SG.chance(0.25);
+};
+SG.T.duel = function (B, a, d, accepted) {
+  a.done = true;
+  if (!accepted) {
+    B.log.push(d.name + '이(가) ' + a.name + '의 일기토 신청을 피했다. 병사들의 사기가 떨어진다.');
+    SG.T.moraleShift(B, a.side, 6);
+    return { refused: true };
+  }
+  var r = SG.duel(a.oid, d.oid);
+  var lu = r.loser === a.oid ? a : d, wu = lu === a ? d : a;
+  B.log.push('일기토! ' + a.name + ' 대 ' + d.name + ' → ' + SG.name(r.winner) + ' 승리. ' + SG.name(r.loser) + '은(는) ' + SG.DUEL_FATE[r.fate] + '.');
+  SG.T.moraleShift(B, wu.side, 12);
+  if (r.fate === 'fled') {
+    SG.T.hit(B, lu, Math.round(lu.n * 0.3));
+  } else {
+    if (r.fate === 'killed') B.killed.push(lu.oid);
+    else B.captured.push({ oid: lu.oid, by: wu.side });
+    // 장수를 잃은 부대는 흩어진다 (절반은 살아 돌아감)
+    lu.ref.oidLost = lu.oid; lu.ref.oid = null; lu.ref.out = true;
+    lu.ref.n = Math.floor(lu.n * 0.5);
+    lu.n = 0; lu.gone = true;
+  }
+  SG.T.checkEnd(B);
+  return r;
+};
+
+SG.T.wait = function (B, u) { u.done = true; };
+
+// ---- 차례·승패
+SG.T.checkEnd = function (B) {
+  if (B.over) return B.over;
+  var a = SG.T.alive(B, 'atk'), d = SG.T.alive(B, 'def');
+  var K = SG.T.CASTLE;
+  var keep = SG.T.at(B, K.c, K.r);
+  if (!a.length) B.over = 'def';
+  else if (!d.length) B.over = 'atk';
+  else if (keep && keep.side === 'atk') { B.over = 'atk'; B.log.push(keep.name + '이(가) 본성을 점령했다!'); }
+  else if (B.morale.atk <= 5) { B.over = 'def'; B.log.push('공격군의 사기가 무너져 물러났다.'); }
+  return B.over;
+};
+SG.T.endSide = function (B) {
+  var side = B.side;
+  B.units.forEach(function (u) { if (u.side === side) { u.done = false; u.moved = false; if (u.conf > 0) u.conf--; } });
+  if (side === 'atk') B.side = 'def';
+  else {
+    B.side = 'atk';
+    B.day++;
+    if (B.day > SG.T.DAYS) { B.over = 'def'; B.log.push(SG.T.DAYS + '일이 지나 군량이 바닥났다. 공격군이 물러난다.'); }
+  }
+  // 혼란한 부대는 이번 차례에 움직이지 못한다
+  B.units.forEach(function (u) { if (u.side === B.side && u.conf > 0) u.done = true; });
+  return B.over;
+};
+SG.T.retreat = function (B, side) {
+  B.over = side === 'atk' ? 'def' : 'atk';
+  B.log.push((side === 'atk' ? '공격군' : '수비군') + '이(가) 퇴각했다.');
+};
+
+// 전투 결과를 전략 화면 형식으로
+SG.T.result = function (B) {
+  B.units.forEach(function (u) { if (!u.gone) u.ref.n = Math.max(0, u.n); });
+  var res = { winner: B.over || 'def', log: B.log.slice(-12), captured: [], killed: B.killed.slice(), days: B.day };
+  B.captured.forEach(function (cp) { res.captured.push({ oid: cp.oid, by: cp.by }); });
+  B.atk.morale = B.morale.atk; B.def.morale = B.morale.def;
+  // 수비 패배 시 예비 장수들은 도시와 함께 처리된다
+  return res;
+};
+
+// ---- 컴퓨터 지휘: 한 부대의 행동 계획 → 실행. step 콜백으로 화면이 움직임을 보여 준다.
+SG.T.aiUnit = function (B, u) {
+  var T = SG.T, K = T.CASTLE;
+  if (u.n <= 0 || u.done || B.over) return null;
+  // 1) 계략
+  if (u.int >= 70 && SG.chance(0.6)) {
+    var st = T.stratTargets(B, u).map(function (t) {
+      var kind = (u.int >= 85 || SG.chance(0.6)) ? 'fire' : 'confuse';
+      return { t: t, kind: kind, p: T.stratChance(B, u, t, kind) };
+    }).sort(function (a, b) { return b.p - a.p; })[0];
+    if (st && st.p >= 0.55) return { type: 'strat', target: st.t, kind: st.kind };
+  }
+  // 2) 일기토 (무력이 크게 앞설 때)
+  var dt = T.duelTargets(B, u).filter(function (t) { return SG.duelWinChance(u.oid, t.oid) > 0.72; })[0];
+  if (dt && SG.chance(0.5)) return { type: 'duel', target: dt };
+  // 3) 이동 + 공격
+  var reach = T.reachable(B, u), bestK = T.key(u.c, u.r), bestScore = -1e9;
+  var enemies = T.alive(B).filter(function (x) { return x.side !== u.side; });
+  var keepFree = !T.at(B, K.c, K.r) || T.at(B, K.c, K.r) === u;
+  Object.keys(reach).forEach(function (k) {
+    var p = k.split(',').map(Number), s = 0;
+    var tt = B.map[k];
+    if (u.side === 'atk') {
+      if (tt === 'keep') s += 1000;
+      s -= T.dist(p, [K.c, K.r]) * 6;
+      var adj = enemies.filter(function (e) { return T.dist(p, [e.c, e.r]) <= T.range(u); });
+      if (adj.length) s += 30 + Math.max.apply(null, adj.map(function (e) { return 20 * (1 - e.n / Math.max(1, e.max)) + (u.n > e.n ? 15 : 0) + 18 * (SG.match(u.t, e.t) - 1); }));
+      if (u.t === 'arc' && enemies.some(function (e) { return T.dist(p, [e.c, e.r]) === 1; })) s -= 25;
+      s += (T.TERRAIN[tt].def - 1) * 20;
+    } else {
+      var dk = T.dist(p, [K.c, K.r]);
+      if (tt === 'keep') {
+        var keepThreat = enemies.some(function (e) { return T.dist([e.c, e.r], [K.c, K.r]) <= 4; });
+        s += u.id === B.keeper ? 500 : (keepThreat ? 220 : 40);
+      }
+      if (dk > 3) s -= (dk - 3) * 25;
+      var adj2 = enemies.filter(function (e) { return T.dist(p, [e.c, e.r]) <= T.range(u); });
+      if (adj2.length) s += 40 + Math.max.apply(null, adj2.map(function (e) { return 25 * (1 - e.n / Math.max(1, e.max)) + 18 * (SG.match(u.t, e.t) - 1); }));
+      if (u.t === 'arc' && enemies.some(function (e) { return T.dist(p, [e.c, e.r]) === 1; })) s -= 25;
+      s += (T.TERRAIN[tt].def - 1) * 60;
+      var near = enemies.reduce(function (m, e) { return Math.min(m, T.dist(p, [e.c, e.r])); }, 99);
+      if (!adj2.length) s -= near * 2;
+    }
+    if (s > bestScore) { bestScore = s; bestK = k; }
+  });
+  var dest = bestK.split(',').map(Number);
+  return { type: 'move', c: dest[0], r: dest[1] };
+};
+// 한 부대를 끝까지 행동시킨다. 반환: 일어난 일 목록
+SG.T.aiAct = function (B, u) {
+  var T = SG.T, events = [];
+  var kp = B.keeper && B.units.filter(function (x) { return x.id === B.keeper; })[0];
+  if (u.side === 'def' && (B.keeper === undefined || !kp || kp.n <= 0)) {
+    var strongest = T.alive(B, 'def').sort(function (a, b) { return (b.lead + b.n / 300) - (a.lead + a.n / 300); })[0];
+    B.keeper = strongest ? strongest.id : null;
+  }
+  var plan = T.aiUnit(B, u);
+  if (!plan) { u.done = true; return events; }
+  if (plan.type === 'strat') { events.push({ type: 'strat', u: u, t: plan.target, msg: T.strategy(B, u, plan.target, plan.kind) }); return events; }
+  if (plan.type === 'duel') {
+    var acc = SG.isPlayer(plan.target.side === 'atk' ? B.atk.fid : B.def.fid) ? null : T.duelAccept(B, u, plan.target);
+    events.push({ type: 'duel', u: u, t: plan.target, ask: acc === null });
+    if (acc !== null) events[0].res = T.duel(B, u, plan.target, acc);
+    return events;
+  }
+  var from = [u.c, u.r];
+  if (plan.c !== u.c || plan.r !== u.r) { T.move(B, u, plan.c, plan.r); events.push({ type: 'move', u: u, from: from }); }
+  if (B.over) return events;
+  var targets = T.attackTargets(B, u).sort(function (a, b) { return (a.n / SG.match(u.t, a.t)) - (b.n / SG.match(u.t, b.t)); });
+  if (targets.length) events.push({ type: 'attack', u: u, t: targets[0], msg: T.attack(B, u, targets[0]) });
+  else u.done = true;
+  return events;
+};
+// 한 쪽 전체를 컴퓨터가 지휘 (화면 없이)
+SG.T.aiSide = function (B) {
+  var list = SG.T.alive(B, B.side).filter(function (u) { return !u.done; });
+  list.sort(function (a, b) { return SG.T.dist([a.c, a.r], [SG.T.CASTLE.c, SG.T.CASTLE.r]) - SG.T.dist([b.c, b.r], [SG.T.CASTLE.c, SG.T.CASTLE.r]); });
+  list.forEach(function (u) {
+    if (B.over) return;
+    var ev = SG.T.aiAct(B, u);
+    ev.forEach(function (e) { if (e.type === 'duel' && e.ask) e.res = SG.T.duel(B, e.u, e.t, SG.T.duelAccept(B, e.u, e.t)); });
+    u.done = true;
+  });
+  if (!B.over) SG.T.endSide(B);
+};
+// 처음부터 끝까지 컴퓨터끼리 (시험용)
+SG.T.autoRun = function (atk, def) {
+  var B = SG.T.create(atk, def), guard = 0;
+  while (!B.over && guard++ < 200) SG.T.aiSide(B);
+  return SG.T.result(B);
+};

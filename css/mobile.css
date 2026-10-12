@@ -1,0 +1,266 @@
+/* 천하쟁패 — 폰·태블릿(작은 화면) 모드. html.compact 일 때만 적용되어 PC 화면은 그대로다.
+   기준: 폰을 가로로 눕힌 화면 (아이폰 13: 약 750×340, 안드로이드: 약 860×360). */
+
+html.compact, html.compact body { min-width: 0; height: 100%; height: 100dvh; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+html.compact body { font-size: 13px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+html.compact .pc-only { display: none !important; }
+html.touch .map-tip { display: none !important; }
+
+/* ---- 세로로 들면 안내 */
+.rotate-hint { display: none; }
+@media (orientation: portrait) {
+  html.compact .rotate-hint { position: fixed; inset: 0; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #1d150b; color: #f6ecd2; text-align: center; padding: 24px; }
+  .rotate-hint b { font-family: var(--f-display); font-weight: 400; font-size: 24px; }
+  .rotate-hint span { font-size: 13px; color: #cdbb94; }
+  .rh-phone { width: 46px; height: 80px; border: 4px solid #d8b765; border-radius: 9px; animation: rh-turn 2s ease-in-out infinite; }
+  @keyframes rh-turn { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+}
+
+/* ---- 위쪽 막대 */
+html.compact .game { grid-template-rows: 44px 1fr; }
+html.compact .topbar { gap: 6px; padding: 0 6px; }
+html.compact .topbar .date { min-width: 0; gap: 6px; }
+html.compact .season { width: 26px; height: 26px; font-size: 16px; }
+html.compact .date-t { font-size: 15px; white-space: nowrap; }
+html.compact .topbar .who .pt { width: 28px !important; height: 28px !important; }
+html.compact .topbar .who > span { display: none; }
+html.compact .topbar .tot { gap: 3px; }
+html.compact .res { padding: 3px 5px; gap: 3px; font-size: 12px; }
+html.compact .res small, html.compact .res.r-city, html.compact .res.r-officer { display: none; }
+html.compact .res .ico { width: 13px; height: 13px; }
+html.compact .topbar .acts { gap: 3px; }
+html.compact .topbar .acts .btn.small { padding: 5px 7px; min-height: 32px; }
+html.compact .topbar .acts .adv-btn { font-size: 0; gap: 0; }
+html.compact .end-turn { padding: 6px 10px; font-size: 13px; min-height: 34px; }
+html.compact .dd { min-width: 190px; max-height: calc(100dvh - 52px); overflow-y: auto; }
+html.compact .dd-item { padding: 11px 14px; }
+
+/* ---- 지도 + 오른쪽 서랍 */
+html.compact .main { grid-template-columns: 1fr; position: relative; }
+html.compact .left { grid-template-rows: 1fr; }
+html.compact .left .log { display: none; }
+html.compact .panel#panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(380px, 52vw); z-index: 6; box-shadow: -10px 0 30px rgba(0, 0, 0, .35); transform: translateX(105%); transition: transform .25s ease-out; -webkit-overflow-scrolling: touch; }
+html.compact .main.drawer-open .panel#panel { transform: none; }
+.drawer-x { display: none; }
+html.compact .drawer-x { display: grid; place-items: center; position: absolute; left: 8px; top: 8px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .5); background: rgba(10, 8, 4, .6); color: #fff; font-size: 16px; cursor: pointer; z-index: 2; }
+html.compact .cb { height: 104px; }
+html.compact .cb-name { font-size: 30px; }
+html.compact .cb-text { left: 50px; bottom: 8px; }
+html.compact .cb-flag { height: 56px; width: 32px; font-size: 19px; }
+html.compact .gov { padding: 10px 12px; }
+html.compact .tiles { padding: 8px 12px 2px; gap: 6px; }
+html.compact .tile { padding: 6px 8px; }
+html.compact .tile-v { font-size: 15px; }
+html.compact .meters { padding: 8px 12px 10px; }
+html.compact .troops { padding: 2px 12px 8px; }
+html.compact .tr-c { font-size: 11px; padding: 3px 4px; }
+html.compact .sec { padding: 10px 12px; }
+html.compact .cmd-tab { padding: 8px 2px; min-height: 44px; }
+html.compact .cmd { min-height: 64px; }
+html.compact .ocards { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+/* 지도 위 장식은 줄인다 */
+html.compact .map-compass, html.compact .map-clouds { display: none; }
+html.compact .map-legend { left: 8px; top: 8px; font-size: 11px; padding: 4px 8px; max-height: 50%; }
+html.compact .map-legend:not(.opened) div { display: none; }
+html.compact .map-cart { top: 6px; }
+html.compact .map-cart > div { padding: 3px 18px 4px; }
+html.compact .map-cart b { font-size: 14px; }
+html.compact .map-cart small, html.compact .map-cart span { display: none; }
+html.compact .map-zoom { right: 8px; top: 8px; }
+html.compact .map-zoom button { width: 38px; height: 38px; }
+html.compact .map-frame i { display: none; }
+html.compact .month-banner { top: 30%; padding: 8px 0; }
+html.compact .mb-season { width: 44px; height: 44px; font-size: 28px; }
+html.compact .mb-text b { font-size: 26px; }
+
+/* ---- 창 (명령·일람·설정) */
+html.compact #modal-root .back { padding: 4px; }
+html.compact .modal { width: 96vw !important; max-width: 96vw; max-height: calc(100dvh - 8px); box-shadow: 0 0 0 2px rgba(46, 36, 21, .9), 0 0 0 3px var(--brz), 0 10px 30px rgba(0, 0, 0, .5); }
+html.compact .modal.narrow { width: min(96vw, 520px) !important; }
+html.compact .modal::before, html.compact .modal::after { display: none; }
+html.compact .modal-h { padding: 6px 14px; gap: 10px; }
+html.compact .mh-ico { width: 30px; height: 30px; }
+html.compact .mh-ico .ico { width: 16px; height: 16px; }
+html.compact .mh-main { font-size: 18px; }
+html.compact .mh-sub { font-size: 11.5px; margin-top: 1px; }
+html.compact .modal-b { padding: 8px 12px 10px; }
+html.compact .modal-f { padding: 5px 12px; }
+html.compact .modal-f .btn { min-height: 36px; padding: 6px 14px; }
+html.compact .brief { padding: 6px 10px; margin-bottom: 8px; gap: 10px; }
+html.compact .gauge { width: 220px; }
+html.compact .step { margin: 8px 0 6px; font-size: 14px; }
+html.compact .tgts { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+html.compact .tgt, html.compact .modal.war .tgt { height: 58px; }
+html.compact .tgt-n, html.compact .modal.war .tgt-n { font-size: 18px; bottom: 16px; }
+html.compact .ocards.big { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+html.compact .pick-cards { max-height: none; }
+html.compact .tpick { gap: 6px; }
+html.compact .tcard { padding: 6px 8px; }
+html.compact .tcard span { display: none; }
+html.compact .tcard i { width: 30px; height: 30px; font-size: 16px; }
+html.compact .frow { grid-template-columns: 34px 110px auto 1fr 56px; gap: 8px; padding: 4px 8px; }
+html.compact .frow .pt { width: 34px !important; height: 34px !important; }
+html.compact .frow input[type=range] { height: 28px; }
+html.compact .tbtn { padding: 5px 8px 5px 4px; }
+html.compact .vs { gap: 8px; }
+html.compact .vs .side { padding: 6px 10px 8px; }
+html.compact .vs .mid span { width: 42px; height: 42px; font-size: 22px; }
+html.compact .field input[type=range] { height: 28px; }
+html.compact .field input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; }
+html.compact table.t td, html.compact table.t th { padding: 7px 6px; }
+html.compact .ocard-detail .ocard-head .pt { width: 110px !important; height: 110px !important; }
+html.compact .ocard-detail .ocard-name { font-size: 26px; }
+html.compact .oc-stats { grid-template-columns: 170px 1fr; }
+html.compact .radar { width: 170px; height: 170px; }
+html.compact .log-modal { max-height: none; font-size: 12.5px; border: 0; }
+html.compact .keys { grid-template-columns: 1fr; }
+html.compact .res-card { width: min(560px, 90vw); padding: 10px 14px 12px; }
+html.compact .rc-head b { font-size: 20px; }
+html.compact .rc-stamp { width: 44px; height: 44px; font-size: 28px; }
+html.compact .rc-row { padding: 3px 8px; gap: 8px; }
+html.compact .rc-k { font-size: 15px; }
+html.compact .rc-to { font-size: 22px; }
+html.compact .rc-d { font-size: 15px; }
+html.compact .ending { gap: 16px; padding: 4px; }
+html.compact .end-hero .pt { width: 120px !important; height: 120px !important; }
+html.compact .ending h1 { font-size: 36px; }
+html.compact .ending p { font-size: 14px; }
+
+/* ---- 장면 (알현·명령·전장·재해): 통째로 줄여서 화면 높이에 맞춘다 */
+html.compact .modal.scene .modal-b { padding: 0; overflow: hidden; }
+html.compact .modal.scene .hall,
+html.compact .modal.scene .cmd-scene,
+html.compact .modal.scene .field-scene { zoom: .56; height: calc((100dvh - 98px) / .56); }
+html.compact .modal.story { width: 96vw !important; }
+html.compact .story-cast .pt { width: 64px !important; height: 64px !important; }
+html.compact .story-text p { font-size: 15px; line-height: 1.6; }
+
+/* ---- 직접 지휘 전투 */
+html.compact .bt { grid-template-rows: 44px 1fr 58px; grid-template-columns: 1fr minmax(210px, 30vw); }
+html.compact .bt-top { gap: 6px; padding: 0 6px; }
+html.compact .bt-top .btn.small { padding: 5px 7px; min-height: 32px; }
+html.compact .bt-svg { width: 100% !important; height: 100% !important; }
+html.compact .bt-stage { overflow: hidden; padding: 2px; }
+html.compact .bt-side { font-size: 12px; }
+html.compact .bt-side .bu-head { padding: 8px; gap: 8px; }
+html.compact .bt-side .bu-head .pt { width: 56px !important; height: 56px !important; }
+html.compact .bt-side .bu-name { font-size: 18px; }
+html.compact .bt-side .cmd { min-height: 46px; padding: 5px 2px; }
+html.compact .bt-side .cmd .ico { width: 16px; height: 16px; }
+html.compact .bt-dlg { padding: 4px 10px; gap: 10px; }
+html.compact .bd-face .pt { width: 44px !important; height: 44px !important; }
+html.compact .bd-who { font-size: 13px; padding: 1px 8px; }
+html.compact .bd-t { font-size: 14px; min-height: 0; }
+html.compact .intro { zoom: .6; }
+html.compact .duel { zoom: .6; }
+html.compact .bt-stamp { zoom: .6; }
+
+/* ---- 타이틀·시나리오·군주 선택 */
+html.compact .t-body { grid-template-columns: 1fr minmax(0, 38%); padding: 0 20px 0 28px; gap: 12px; }
+html.compact .t-left { gap: 10px; }
+html.compact .t-left h1 { font-size: 44px; }
+html.compact .t-left h1 .seal { font-size: 22px; transform: translateY(-5px) rotate(-4deg); margin-left: 8px; }
+html.compact .t-left .eyebrow { font-size: 11px; }
+html.compact .t-left .lede { font-size: 12.5px; line-height: 1.55; }
+html.compact .heroes { grid-template-columns: repeat(3, minmax(0, 92px)); gap: 8px; }
+html.compact .hero figcaption { left: 3px; right: 3px; bottom: 3px; padding: 2px 5px; }
+html.compact .hero figcaption b { font-size: 13px; }
+html.compact .hero figcaption span { display: none; }
+html.compact .title-foot { display: none; }
+html.compact .title-snd span { display: none; }
+html.compact .setup-head { padding: 6px 12px; gap: 10px; }
+html.compact .setup-head h2 { font-size: 18px; }
+html.compact .setup-body { padding: 10px 12px; }
+html.compact .scen-grid2 { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+html.compact .sc-map { height: 110px; }
+html.compact .lord-wrap2 { grid-template-columns: 1fr minmax(300px, 46vw); }
+
+/* 화면 폭을 넘는 요소가 있어도 페이지가 넓어지지 않게 (폰 브라우저는 넘치면 화면을 넓혀 버린다) */
+html.compact, html.compact body, html.compact #app { width: 100%; max-width: 100vw; overflow: hidden; }
+html.compact .game, html.compact .topbar { max-width: 100vw; overflow: hidden; }
+html.compact .topbar .tot { min-width: 0; overflow: hidden; }
+html.compact #modal-root .back { width: 100vw; height: 100dvh; }
+/* 타이틀 차림 */
+html.compact .t-left .eyebrow { display: none; }
+html.compact .title-menu { gap: 6px; max-width: 280px; }
+html.compact .title-menu .btn { padding: 7px 12px; font-size: 14px; min-height: 38px; }
+html.compact .t-body { height: 100dvh; overflow-y: auto; }
+.lbl-short { display: none; }
+html.compact .lbl-long { display: none; } html.compact .lbl-short { display: inline; }
+/* 전투 위쪽 막대: 제목·날짜 띠 줄이기 */
+html.compact .bt-top .date-t, html.compact .bt-top .days-bar { display: none; }
+html.compact .bt-top .tug { flex: 1; min-width: 0; gap: 6px; }
+html.compact .bt-top .tug-side { font-size: 11px; gap: 3px; white-space: nowrap; }
+html.compact .bt-top .tug-bar { min-width: 60px; flex: 1; }
+html.compact .bt-top .days { min-width: 0; }
+html.compact .bt-top .sp { display: none; }
+html.compact .bt-top .acts { flex: none; }
+html.compact .bt-auto { font-size: 11px; }
+html.compact .intro { inset: 44px 0 0 0; zoom: 1; }
+html.compact .intro-side { padding: 0 16px; }
+html.compact .intro .pt { width: 64px !important; height: 64px !important; }
+/* 출진 목표 카드 */
+html.compact .tgt-own { top: 3px; left: 4px; font-size: 10px; padding: 0 5px; }
+html.compact .tgt.on::after { font-size: 11px; top: 3px; right: 3px; padding: 1px 4px; }
+html.compact .tgt, html.compact .modal.war .tgt { height: 64px; }
+html.compact .tgt-n, html.compact .modal.war .tgt-n { font-size: 17px; bottom: 17px; left: 6px; }
+html.compact .tgt-s { left: 6px; bottom: 3px; font-size: 10.5px; }
+html.compact .intro-name { font-size: 32px; }
+html.compact .intro-faces img { width: 60px; height: 60px; }
+html.compact .intro-city { font-size: 22px; }
+html.compact .intro-mid b, html.compact .intro-vs { font-size: 60px; }
+html.compact .t-body { align-content: center; }
+html.compact .t-left h1 { font-size: 38px; }
+html.compact .title-menu { grid-template-columns: 1fr 1fr; max-width: 360px; }
+html.compact .title-menu .btn:first-child { grid-column: 1 / -1; }
+@media (max-height: 420px) { html.compact .t-left .lede { display: none; } }
+
+/* ===== Claude 앱 안처럼 화면 높이가 아주 낮을 때 (약 300px) ===== */
+/* 군주 선택: 오른쪽은 스크롤, 「시작」 단추는 늘 아래에 붙어 있게 */
+html.compact .setup-head .btn { padding: 4px 10px; min-height: 32px; }
+html.compact .setup-head .note { display: none; }
+html.compact .lord-side { overflow-y: auto; -webkit-overflow-scrolling: touch; position: relative; }
+html.compact .lord-detail { padding: 8px 10px; }
+html.compact .ld-top { gap: 10px; }
+html.compact .ld-face { width: 62px; height: 62px; border-width: 3px; }
+html.compact .ld-info { gap: 3px; }
+html.compact .ld-flag { font-size: 11px; padding: 1px 8px; }
+html.compact .ld-name { font-size: 22px; }
+html.compact .ld-stats { gap: 6px; }
+html.compact .ld-stats b { font-size: 14px; }
+html.compact .ld-stats small { font-size: 10px; }
+html.compact .ld-tot, html.compact .ld-diff { font-size: 11px; gap: 6px; }
+html.compact .ld-offs { margin: 6px 0 0; gap: 4px; }
+html.compact .ld-off { width: 34px; }
+html.compact .ld-off img { width: 32px; height: 32px; }
+html.compact .ld-off small { font-size: 9.5px; }
+html.compact .ld-start { position: sticky; bottom: 6px; z-index: 2; margin-top: 8px; font-size: 16px; padding: 8px 12px; min-height: 42px; box-shadow: 0 6px 16px rgba(0, 0, 0, .35); }
+html.compact .lord-list2 { padding: 6px 10px 10px; gap: 6px; }
+html.compact .lord-item2 { padding: 5px 8px; gap: 8px; }
+html.compact .lord-item2 .li-face { width: 36px; height: 36px; }
+html.compact .ld-empty { padding: 6px 0; }
+html.compact .ld-empty b { font-size: 18px; }
+html.compact .ld-empty span { font-size: 12px; }
+@media (max-height: 340px) {
+  html.compact .game { grid-template-rows: 38px 1fr; }
+  html.compact .season { width: 22px; height: 22px; font-size: 13px; }
+  html.compact .date-t { font-size: 13px; }
+  html.compact .topbar .acts .btn.small, html.compact .end-turn { min-height: 30px; padding: 4px 7px; }
+  html.compact .modal-h { padding: 4px 12px; }
+  html.compact .mh-ico { width: 26px; height: 26px; }
+  html.compact .mh-main { font-size: 16px; }
+  html.compact .modal-f .btn { min-height: 32px; padding: 4px 12px; }
+  html.compact .modal.scene .hall, html.compact .modal.scene .cmd-scene, html.compact .modal.scene .field-scene { zoom: .5; height: calc((100dvh - 84px) / .5); }
+  html.compact .bt { grid-template-rows: 38px 1fr 50px; }
+  html.compact .bd-face .pt { width: 38px !important; height: 38px !important; }
+  html.compact .bd-t { font-size: 13px; }
+  html.compact .cb { height: 84px; }
+  html.compact .cb-name { font-size: 24px; }
+  html.compact .sc-map { height: 90px; }
+}
+@media (max-height: 340px) {
+  html.compact .t-body { align-content: start; padding-top: 10px; padding-bottom: 10px; }
+  html.compact .t-left h1 { font-size: 30px; }
+  html.compact .t-left h1 .seal { font-size: 18px; }
+  html.compact .title-menu .btn { min-height: 34px; padding: 5px 12px; }
+}

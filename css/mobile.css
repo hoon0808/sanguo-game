@@ -264,3 +264,7 @@ html.compact .ld-empty span { font-size: 12px; }
   html.compact .t-left h1 .seal { font-size: 18px; }
   html.compact .title-menu .btn { min-height: 34px; padding: 5px 12px; }
 }
+
+/* 알림 글(토스트): 지도 가운데를 가리지 않게 작게, 위쪽 막대 바로 아래에 */
+html.compact #toast-root { top: 40px; max-width: 72vw; }
+html.compact .toast { font-size: 12px; padding: 6px 14px; line-height: 1.4; }

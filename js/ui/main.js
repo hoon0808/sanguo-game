@@ -86,13 +86,14 @@ SG.UI.renderTop = function () {
     var lord = S.forces[S.player].lord;
     var who = h('button', { class: 'who', type: 'button', title: '군주 정보', onclick: function () { SG.UI.officerCard(lord); } }, [SG.UI.portrait(lord, 38), h('span', null, [h('small', { text: '군주' }), SG.forceName(S.player)])]);
     top.appendChild(who);
-    var ready = SG.citiesOf(S.player).reduce(function (s, c) { return s + SG.readyOfficers(c).length; }, 0);
+    // 위임한 도시는 턴 종료 때 태수가 알아서 하므로 세지 않는다
+    var ready = SG.citiesOf(S.player).reduce(function (s, c) { return s + (S.cities[c].deleg ? 0 : SG.readyOfficers(c).length); }, 0);
     function res(icon, label, v, cls) { return h('span', { class: 'res r-' + icon + ' ' + (cls || ''), title: label }, [SG.UI.icon(icon, 16), h('b', { text: v }), h('small', { text: label })]); }
     top.appendChild(h('div', { class: 'tot' }, [
       res('city', '도시', t.cities), res('officer', '장수', t.officers), res('soldier', '병사', SG.fmt(t.soldiers)),
       res('gold', '금', SG.fmt(t.gold)), res('food', '식량', SG.fmt(t.food))
     ]));
-    var rb = res('order', '남은 명령', ready, ready ? 'hot go' : '');
+    var rb = res('order', SG.UI.isCompact() ? '명령' : '남은 명령', ready, ready ? 'hot go' : '');
     if (ready) { rb.title = '명령할 장수가 있는 다음 도시로 (Tab)'; rb.addEventListener('click', SG.UI.nextReadyCity); }
     top.lastChild.appendChild(rb);
   }

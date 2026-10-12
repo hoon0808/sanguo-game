@@ -17,8 +17,9 @@ SG.endTurn = async function () {
   if (S.over) return;
   if (S.player && SG.S.forces[S.player].alive) {
     var mine = SG.citiesOf(S.player);
-    mine.forEach(function (cid) { if (S.cities[cid].deleg) SG.AI.city(cid); });
-    if (mine.some(function (cid) { return S.cities[cid].deleg; })) await SG.AI.military(S.player, true);
+    var reps = mine.filter(function (cid) { return S.cities[cid].deleg; }).map(SG.runDelegated);
+    if (reps.length && SG.ui && SG.ui.delegReport) await SG.ui.delegReport(reps);
+    if (reps.length) await SG.AI.military(S.player, true);
   }
   var order = SG.shuffle(SG.aliveForces().filter(function (f) { return f !== S.player; }));
   for (var i = 0; i < order.length; i++) {
@@ -27,6 +28,21 @@ SG.endTurn = async function () {
     if (S.over) return;
   }
   await SG.nextMonth();
+};
+
+// 위임한 도시: 태수(컴퓨터)가 남은 장수에게 명령을 내린다. 무엇을 했는지 보고를 돌려준다
+SG.DELEG_FIELDS = ['gold', 'food', 'soldiers', 'agri', 'comm', 'wall', 'loyal', 'train', 'morale'];
+SG.runDelegated = function (cid) {
+  var c = SG.S.cities[cid], before = {}, after = {};
+  SG.DELEG_FIELDS.forEach(function (f) { before[f] = c[f]; });
+  var idle = SG.readyOfficers(cid).length, acts;
+  SG.cmdLog = [];
+  try { SG.AI.city(cid); } finally { acts = SG.cmdLog; SG.cmdLog = null; }
+  SG.DELEG_FIELDS.forEach(function (f) { after[f] = c[f]; });
+  acts.forEach(function (a) { SG.log(null, SG.cityName(cid) + '(위임) — ' + a.msg, 'deleg'); });
+  var why = acts.length ? '' : !idle ? '이번 달은 직접 명령을 내려서 남은 장수가 없었습니다' :
+    c.gold < 150 ? '금이 모자라 할 수 있는 일이 없었습니다 (금 ' + c.gold + ')' : '지금은 더 할 일이 없다고 보았습니다';
+  return { cid: cid, before: before, after: after, acts: acts, idle: idle, why: why };
 };
 
 SG.nextMonth = async function () {

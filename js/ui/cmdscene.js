@@ -363,6 +363,27 @@ SG.UI.noteAct = function (o, r, rows) {
   ((d.acts = d.acts || {})[o.cid] = d.acts[o.cid] || []).push({ text: text, good: ok });
 };
 
+// ---- 위임 보고: 턴 종료 때 위임한 도시마다 태수가 무엇을 했는지 (바뀐 수치 + 장수별 한 일)
+SG.ui.delegReport = function (reps) {
+  var cards = reps.map(function (rp) {
+    var rows = SG.UI.CITY_FIELDS.filter(function (f) { return f[0] in rp.before && rp.before[f[0]] !== rp.after[f[0]]; })
+      .map(function (f) { return { label: f[1], from: rp.before[f[0]], to: rp.after[f[0]] }; });
+    var who = {}; rp.acts.forEach(function (a) { who[a.oid] = 1; });
+    var gov = SG.UI.governor(rp.cid);
+    var card = SG.UI.resultCard({ kind: 'deleg', cid: rp.cid }, {
+      stamp: '任', success: rp.acts.length > 0, title: SG.cityName(rp.cid) + (gov ? ' — 태수 ' + SG.name(gov) : ''),
+      msg: rp.acts.length ? '장수 ' + Object.keys(who).length + '명에게 ' + rp.acts.length + '가지 일을 맡겼습니다' : rp.why
+    }, rows);
+    if (rp.acts.length) card.appendChild(h('div', { class: 'dr-acts' }, rp.acts.map(function (a) {
+      return h('div', { class: 'dr-act' + (a.ok ? '' : ' ng') }, [SG.UI.portrait(a.oid, 28), h('span', { text: a.msg })]);
+    })));
+    return card;
+  });
+  SG.UI.sfx(reps.some(function (rp) { return rp.acts.length; }) ? 'ok' : 'click');
+  return SG.UI.modal({ title: '위임 보고 — 태수들이 이번 달 한 일', icon: 'scroll', size: 'narrow', body: h('div', { class: 'deleg-rep' }, cards),
+    buttons: [{ label: '확인', value: true, cls: 'primary' }] });
+};
+
 // ---- 재해 장면 (규칙 쪽 SG.runEvents 가 부른다)
 SG.ui.snap = function (cid) { return SG.UI.snapshot({ cities: [cid] }); };
 SG.ui.disaster = async function (ev) {

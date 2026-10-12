@@ -1331,3 +1331,11 @@ kbd { display: inline-block; min-width: 92px; text-align: center; padding: 2px 8
 @keyframes waterRise { to { transform: translateY(-10px); } }
 .cs-fire { transform-box: fill-box; transform-origin: center bottom; animation: flame2 1s ease-in-out infinite alternate; opacity: 1; }
 .cmd-scene.bg-quake { animation: scr-shake2 .5s 3; }
+/* 위임 보고 */
+.deleg-rep { display: grid; gap: 12px; }
+#modal-root .deleg-rep .res-card { width: auto; max-width: none; animation: none; box-shadow: 0 0 0 1px var(--brz), 0 4px 12px rgba(0, 0, 0, .18); padding: 12px 14px; }
+.dr-acts { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(176, 138, 62, .45); }
+.dr-act { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.4; }
+.dr-act .pt { flex: none; }
+.dr-act.ng { opacity: .7; }
+.deleg-rep .rc-k { white-space: nowrap; }

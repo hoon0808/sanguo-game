@@ -334,3 +334,7 @@ html.portrait .topbar .dd { right: auto; left: 0; }
 /* 표(장수·세력 일람)는 글자를 줄바꿈하지 않고 옆으로 밀어서 본다 */
 html.portrait .modal-b { overflow-x: auto; }
 html.portrait .modal table.t th, html.portrait .modal table.t td { white-space: nowrap; }
+/* 명령 설명 띠: 꼬리표 위, 막대 아래 (좁은 폭에서 글자가 한 자씩 세로로 서지 않게) */
+html.portrait .brief { flex-direction: column; align-items: stretch; gap: 8px; }
+html.portrait .brief .gauge { width: auto; }
+html.portrait .brief-t .chip-b { white-space: normal; }

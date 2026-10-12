@@ -18,6 +18,7 @@ function done(oid, msg, extra) {
   SG.S.off[oid].acted = true;
   var r = { ok: true, msg: msg };
   if (extra) for (var k in extra) r[k] = extra[k];
+  if (SG.cmdLog) SG.cmdLog.push({ oid: oid, msg: SG.josa(msg), ok: r.success !== false });
   return r;
 }
 
@@ -169,7 +170,9 @@ SG.cmd.reward = function (cid, target) {
   c.gold -= SG.COST.reward;
   var g = SG.randInt(6, 12);
   t.loy = Math.min(100, t.loy + g);
-  return { ok: true, msg: SG.name(target) + '에게 금 ' + SG.COST.reward + '을(를) 내렸다. 충성 +' + g, gain: g };
+  var msg = SG.name(target) + '에게 금 ' + SG.COST.reward + '을(를) 내렸다. 충성 +' + g;
+  if (SG.cmdLog) SG.cmdLog.push({ oid: target, msg: SG.josa(msg), ok: true });
+  return { ok: true, msg: msg, gain: g };
 };
 
 // ---- 이동·수송 (인접한 우리 도시로)

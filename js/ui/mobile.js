@@ -7,12 +7,19 @@ SG.UI.isCompact = function () { return document.documentElement.classList.contai
 SG.UI.applyCompact = function () {
   var el = document.documentElement, touch = SG.UI.isTouch();
   var compact = touch || window.innerWidth < 1000;
+  // 세로 화면: 위에 지도, 아래에 도시 장부·명령판 (html.portrait)
+  var portrait = compact && window.innerHeight > window.innerWidth;
   el.classList.toggle('touch', touch);
-  if (compact !== el.classList.contains('compact')) {
-    el.classList.toggle('compact', compact);
-    if (SG.UI.state && document.getElementById('topbar')) SG.UI.refresh();
+  var was = el.classList.contains('compact') + ':' + el.classList.contains('portrait');
+  el.classList.toggle('compact', compact);
+  el.classList.toggle('portrait', portrait);
+  if (was !== compact + ':' + portrait && SG.UI.state && document.getElementById('topbar')) {
+    SG.UI.refresh();
+    var m = SG.UI.state.map;
+    if (m) requestAnimationFrame(function () { m.home(SG.UI.state.sel); });
   }
 };
+SG.UI.isPortrait = function () { return document.documentElement.classList.contains('portrait'); };
 
 // 오른쪽 도시 장부 서랍 (작은 화면에서만 열고 닫힘)
 SG.UI.setDrawer = function (open) {
@@ -44,10 +51,6 @@ SG.UI.toggleFullscreen = function () {
 window.addEventListener('DOMContentLoaded', function () {
   SG.UI.applyCompact();
   window.addEventListener('resize', SG.UI.applyCompact);
-  // 세로로 들고 있으면 「가로로 돌려 주세요」
-  document.body.appendChild(h('div', { class: 'rotate-hint' }, [
-    h('div', { class: 'rh-phone' }), h('b', { text: '폰을 가로로 돌려 주세요' }), h('span', { text: '천하쟁패는 가로 화면에 맞춰져 있습니다' })
-  ]));
   // 아이폰은 손가락을 뗄 때 소리를 켤 수 있다
   ['touchend', 'click'].forEach(function (ev) {
     document.addEventListener(ev, function () {

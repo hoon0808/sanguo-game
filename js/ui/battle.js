@@ -413,8 +413,15 @@ SG.UI.tactical = function (atk, def) {
     }
     function redraw() { drawHi(); drawUnits(); drawTop(); drawSide(); drawLog(); turnBanner(); }
 
+    // 세로 화면에서는 전장이 옆으로 길어 넘치므로, 고른 부대가 보이게 옆으로 밀어 준다
+    function reveal(u) {
+      if (!u || !SG.UI.isPortrait || !SG.UI.isPortrait()) return;
+      var k = svgEl.getBoundingClientRect().width / W, x = at(u).x * k;
+      if (x < stage.scrollLeft + 40 || x > stage.scrollLeft + stage.clientWidth - 40) stage.scrollTo({ left: x - stage.clientWidth / 2, behavior: 'smooth' });
+    }
     function selectUnit(u) {
       st.sel = u; st.prev = null;
+      reveal(u);
       st.mode = (u.side === me && myTurn() && !u.done) ? (u.moved ? 'idle' : 'move') : 'idle';
       redraw();
       say(u, voice(u));
@@ -614,7 +621,7 @@ SG.UI.tactical = function (atk, def) {
         if (introDone) return;
         introDone = true;
         ov.classList.add('out');
-        setTimeout(function () { ov.remove(); redraw(); if (B.side !== me) runAI(); }, 350);
+        setTimeout(function () { ov.remove(); redraw(); reveal(SG.T.alive(B, me)[0]); if (B.side !== me) runAI(); }, 350);
       }
       ov.addEventListener('click', go);
       root.appendChild(ov);

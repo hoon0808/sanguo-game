@@ -114,7 +114,9 @@ SG.UI.Map.prototype.build = function () {
   this.bindPanZoom();
   this.update();
   var me = this;
-  requestAnimationFrame(function () { if (SG.UI.isCompact && SG.UI.isCompact()) { me.fit(); if (SG.S && SG.S.player && SG.S.forces[SG.S.player]) me.focus(SG.S.forces[SG.S.player].capital); } });
+  requestAnimationFrame(function () {
+    if (SG.UI.isCompact && SG.UI.isCompact()) me.home(SG.S && SG.S.player && SG.S.forces[SG.S.player] && SG.S.forces[SG.S.player].capital);
+  });
 };
 SG.UI.Map.prototype.applyVB = function () {
   var v = this.vb;
@@ -189,6 +191,14 @@ SG.UI.Map.prototype.fit = function () {
   if (asp > 1.4) { var w = Math.min(1200, 790 * asp), hh = w / asp; this.vb = { x: 515 - w / 2, y: 435 - hh / 2, w: w, h: hh }; }
   else this.vb = { x: 20, y: 40, w: 990, h: 790 };
   this.applyVB();
+};
+// 작은 화면: 전체 보기 후 그 도시로. 세로 화면은 지도 칸이 작으므로 그 도시 둘레를 확대해서 보여 준다
+SG.UI.Map.prototype.home = function (cid) {
+  this.fit();
+  var C = cid && SG.CITIES[cid];
+  if (!C) return;
+  if (SG.UI.isPortrait && SG.UI.isPortrait()) { this.zoomBy(560 / this.vb.w); this.vb.x = C.x - this.vb.w / 2; this.vb.y = C.y - this.vb.h / 2; this.applyVB(); }
+  else this.focus(cid);
 };
 // 도시가 화면 가장자리 밖이면 그 도시가 가운데 오도록 옮긴다 (확대 정도는 그대로)
 SG.UI.Map.prototype.focus = function (cid) {

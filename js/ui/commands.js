@@ -409,7 +409,7 @@ SG.UI.cmdTransport = async function (cid) {
   } });
   var sG = SG.UI.slider('금', c.gold, 0), sF = SG.UI.slider('식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 금·식량을 수레에 싣고 갔다가 돌아옵니다 · 장수는 이 도시에 그대로 남습니다 · 병사는 「인사 → 이동」'),
+    SG.UI.brief('장수가 금·식량을 수레에 싣고 갔다가 돌아옵니다 · 길을 가는 동안이라 다음 달(턴 종료 뒤)에 도착합니다 · 장수는 이 도시에 그대로 남습니다 · 병사는 「인사 → 이동」'),
     h('div', { class: 'field' }, [h('label', { text: '보낼 곳' }), sel]),
     sG, sF,
     h('p', { class: 'note', text: '수레를 몰 장수 한 명을 고르세요 (이번 달 명령을 씁니다).' }),

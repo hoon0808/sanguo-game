@@ -1531,3 +1531,4 @@ html.compact .t-diff-h small, html.compact .diff-desc { display: none; }
 .diff-b { min-width: 0; white-space: nowrap; }
 @media (max-width: 520px) { .diff-b i { display: none; } }
 .t-diff { max-width: min(460px, calc(100vw - 44px)); }
+.chip.convoy { background: rgba(176, 138, 62, .18); color: #6b5214; border-color: rgba(176, 138, 62, .5); }

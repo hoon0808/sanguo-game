@@ -117,6 +117,9 @@ SG.nextMonth = async function () {
   if (S.month > 12) { S.month = 1; S.year++; }
   Object.keys(S.off).forEach(function (o) { S.off[o].acted = false; });
   if (SG.resetCmds) SG.resetCmds();
+  // 지난달에 보낸 수레(금·식량)가 도착
+  S.arrived = {};
+  if (SG.deliverConvoys) SG.deliverConvoys();
 
   // 수입·수확·식량
   Object.keys(S.cities).forEach(function (cid) {

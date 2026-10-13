@@ -250,14 +250,43 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   }
   var mix = SG.mixOf(src, soldiers);
   SG.takeTroops(a, mix, src); SG.putTroops(b, mix, dest);
-  a.food -= food; b.food += food;
-  a.gold -= gold; b.gold += gold;
-  var what = [soldiers ? '병사 ' + SG.fmt(soldiers) : '', gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
+  // 금·식량은 수레에 실려 길을 가므로 다음 달(턴이 지난 뒤)에 도착한다
+  a.food -= food; a.gold -= gold;
+  if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food);
+  var goods = [gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
+  var what = [soldiers ? '병사 ' + SG.fmt(soldiers) : '', goods].filter(Boolean).join('·');
   // 병사는 장수가 이끈다: 데려올 때는 장수가 그 도시에 가서 병사를 이끌고 돌아온다
-  var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보내고 돌아왔다.'
-    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 ' + what + '을(를) 이끌고 돌아왔다.'
-    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + what + '을(를) 실어 왔다.';
-  return done(oid, msg, { moved: soldiers, src: src, dest: dest });
+  var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보냈다. 다음 달에 도착한다.'
+    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) 다음 달에 도착한다.' : '')
+    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + goods + '을(를) 실어 오게 했다. 다음 달에 도착한다.';
+  return done(oid, msg, { moved: soldiers, src: src, dest: dest, convoy: (food || gold) ? { gold: gold, food: food } : null });
+};
+
+// ---- 수레 (금·식량이 길 위에 있는 동안)
+SG.addConvoy = function (from, to, fid, gold, food) {
+  var S = SG.S;
+  (S.convoys = S.convoys || []).push({ from: from, to: to, fid: fid, gold: gold || 0, food: food || 0 });
+};
+SG.convoysTo = function (cid) {
+  return (SG.S.convoys || []).filter(function (v) { return v.to === cid; });
+};
+// 달이 바뀔 때 도착. 받을 도시를 빼앗겼으면 보낸 도시로 되돌아가고, 둘 다 잃었으면 사라진다
+SG.deliverConvoys = function () {
+  var S = SG.S, list = S.convoys || [];
+  S.convoys = [];
+  list.forEach(function (v) {
+    var to = S.cities[v.to], from = S.cities[v.from];
+    var dest = to && to.owner === v.fid ? v.to : from && from.owner === v.fid ? v.from : null;
+    var what = [v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join('·');
+    if (!dest) { SG.log(v.fid, SG.cityName(v.to) + '(으)로 가던 ' + what + '을(를) 잃었다.', 'warn'); return; }
+    var c = S.cities[dest];
+    c.gold += v.gold; c.food += v.food;
+    if (SG.isPlayer && SG.isPlayer(v.fid)) {
+      SG.log(v.fid, dest === v.to ? SG.cityName(v.from) + '에서 보낸 ' + what + '이(가) ' + SG.cityName(v.to) + '에 도착했다.'
+        : SG.cityName(v.to) + '을(를) 잃어 ' + what + '이(가) ' + SG.cityName(v.from) + '(으)로 되돌아왔다.', dest === v.to ? 'sys' : 'warn');
+      (S.arrived = S.arrived || {})[dest] = { gold: ((S.arrived[dest] || {}).gold || 0) + v.gold, food: ((S.arrived[dest] || {}).food || 0) + v.food };
+    }
+  });
 };
 
 // ---- 교역: 시장에서 식량을 사고판다. 값(식량 100당 금)은 철·상업·이달 시세·맡은 장수의 정치에 따라 달라진다

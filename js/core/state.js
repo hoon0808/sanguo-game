@@ -80,6 +80,7 @@ SG.newGame = function (scenarioId, playerLord, seed) {
     fids.forEach(function (b) { if (a < b) S.diplo[a + '|' + b] = { fr: SG.randInt(30, 60), ally: 0 }; });
   });
   if (playerLord) S.player = 'F_' + playerLord;
+  SG.initItems(S);
   S.rng = SG.rng.s;
   SG.S = S;
   SG.log('·', sc.year + '년 ' + sc.month + '월, ' + sc.name + ' 시나리오가 시작되었다.', 'sys');
@@ -158,6 +159,7 @@ SG.deserialize = function (text) {
   SG.buildOfficers();
   SG.S = S;
   SG.seedRng(S.rng);
+  if (SG.initItems) SG.initItems(S);
   return S;
 };
 SG.saveSlot = function (slot) {

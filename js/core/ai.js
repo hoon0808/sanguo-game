@@ -32,7 +32,11 @@ SG.AI.city = function (cid) {
     if (pool.length >= 2 && !c._searched && SG.chance(0.35)) {
       c._searched = true;
       var s = take('int');
-      if (s) { SG.cmd.search(cid, s); continue; }
+      if (s) {
+        var sr = SG.cmd.search(cid, s);
+        if (sr && sr.item) SG.log(c.owner, SG.forceName(c.owner) + '의 ' + SG.name(s) + '이(가) ' + SG.cityName(cid) + '에서 ' + SG.itemName(sr.item) + '을(를) 손에 넣었다.', 'person');
+        continue;
+      }
     }
     // 3) 민심
     if (c.loyal < 45 && c.food >= 800) {

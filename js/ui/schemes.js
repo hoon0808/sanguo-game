@@ -9,7 +9,8 @@ SG.UI.CMD_GROUPS.push(
   { name: '외교', items: [
     { label: '친선', run: function (cid) { return SG.UI.cmdDiplo(cid, 'gift'); } },
     { label: '동맹', run: function (cid) { return SG.UI.cmdDiplo(cid, 'ally'); } },
-    { label: '항복 권고', run: function (cid) { return SG.UI.cmdDiplo(cid, 'demand'); } }
+    { label: '항복 권고', run: function (cid) { return SG.UI.cmdDiplo(cid, 'demand'); } },
+    { label: '교역', run: function (cid) { return SG.UI.cmdTrade(cid); } }
   ] }
 );
 

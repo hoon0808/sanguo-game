@@ -110,7 +110,7 @@ SG.T.create = function (atk, def) {
 SG.T.unit = function (B, ref, side, c, r) {
   var o = ref.oid ? SG.O(ref.oid) : { lead: 30, war: 30, int: 20, sk: null, n: '수비병' };
   return { id: ++B.seq, ref: ref, oid: ref.oid, side: side, c: c, r: r, n: ref.n, max: ref.n, done: false, conf: 0, t: ref.t || 'inf',
-    lead: o.lead, war: o.war, int: o.int, sk: o.sk, name: ref.oid ? SG.name(ref.oid) : '수비병' };
+    lead: o.lead, war: o.war, int: o.int, sk: o.sk, mv: SG.itemMove ? SG.itemMove(ref.oid) : 0, name: ref.oid ? SG.name(ref.oid) : '수비병' };
 };
 SG.T.at = function (B, c, r) {
   for (var i = 0; i < B.units.length; i++) { var u = B.units[i]; if (u.n > 0 && u.c === c && u.r === r) return u; }
@@ -130,7 +130,7 @@ SG.T.moveCost = function (B, u, c, r) {
   if (u.t === 'cav' && (tt === 'forest' || tt === 'hill' || tt === 'mountain' || tt === 'water')) return SG.T.TERRAIN[tt].cost + 1;
   return SG.T.TERRAIN[tt].cost;
 };
-SG.T.movePoints = function (u) { return 4 + (u.t === 'cav' ? 2 : 0) + (u.sk === '기마' ? 1 : 0); };
+SG.T.movePoints = function (u) { return 4 + (u.t === 'cav' ? 2 : 0) + (u.sk === '기마' ? 1 : 0) + (u.mv || 0); };
 SG.T.enemyAdj = function (B, u, c, r) {
   return SG.T.neighbors(c, r).some(function (nb) { var x = SG.T.at(B, nb[0], nb[1]); return x && x.side !== u.side; });
 };
@@ -212,10 +212,35 @@ SG.T.FORMS = {
   normal: { n: '공격', h: '攻', desc: '보통 공격. 맞붙어 싸우면 반격을 받습니다.' },
   charge: { n: '돌격', h: '突', desc: '적진에 달려듭니다. 피해 ×1.3 (기병이 움직인 뒤면 ×1.43), 적 사기가 더 떨어집니다. 대신 반격을 세게(×1.5) 받습니다. 궁병은 못 씀.' },
   combo: { n: '연속 공격', h: '連', desc: '무력 80 이상 장수만. 두 번 잇달아 칩니다 (0.65 + 0.65). 반격은 한 번.' },
-  volley: { n: '일제 사격', h: '射', desc: '궁병만. 화살비로 목표(×0.9)와 그 옆의 적(×0.35)까지 맞힙니다. 반격 없음.' },
-  pincer: { n: '협공', h: '挾', desc: '목표 옆에 아군이 있어야 합니다. 옆 아군 하나마다 피해 +20%, 반격은 −30%.' }
+  volley: { n: '일제 사격', h: '射', t: 'arc', desc: '궁병만. 화살비로 목표(×0.9)와 그 옆의 적(×0.35)까지 맞힙니다. 반격 없음.' },
+  pincer: { n: '협공', h: '挾', desc: '목표 옆에 아군이 있어야 합니다. 옆 아군 하나마다 피해 +20%, 반격은 −30%.' },
+  // 병종 전법
+  breach: { n: '돌파', h: '破', t: 'cav', desc: '기병만. 적 부대를 꿰뚫고 그 뒤 칸으로 빠져나갑니다 (뒤 칸이 비어 있어야 함). 피해 ×1.2, 반격은 ×0.6, 적이 흩어져 혼란에 빠질 수 있습니다.' },
+  push: { n: '밀어내기', h: '推', t: 'inf', desc: '보병만. 방패를 앞세워 적을 한 칸 밀어내고 그 자리로 들어갑니다. 밀려날 곳이 막혀 있으면 짓눌려 피해가 커집니다(×1.4). 병사가 많고 무력이 높을수록 잘 밀립니다.' },
+  firearrow: { n: '불화살', h: '火', t: 'arc', desc: '궁병만. 불화살을 쏩니다. 피해 ×0.75 이지만 불이 붙으면 더 타고(숲이면 잘 붙음, 물이면 안 붙음) 적이 하루 동안 혼란에 빠집니다. 지력이 높을수록 잘 붙습니다.' }
 };
-SG.T.FORM_KEYS = ['normal', 'charge', 'combo', 'volley', 'pincer'];
+SG.T.FORM_KEYS = ['normal', 'charge', 'combo', 'volley', 'pincer', 'breach', 'push', 'firearrow'];
+// a 에서 d 쪽으로 한 칸 더 간 칸 (d 의 바로 뒤)
+SG.T.beyond = function (a, d) {
+  var p = SG.T.cube(a.c, a.r), q = SG.T.cube(d.c, d.r);
+  var x = 2 * q[0] - p[0], r = 2 * q[2] - p[2], c = x + (r - (r & 1)) / 2;
+  return SG.T.inside(c, r) ? [c, r] : null;
+};
+// u 가 p 칸에 들어설 수 있는지 (비어 있고, 성벽·물이 아님)
+SG.T.canEnter = function (B, u, p) {
+  if (!p || SG.T.at(B, p[0], p[1])) return false;
+  var tt = B.map[SG.T.key(p[0], p[1])];
+  if (tt === 'water' && u.sk !== '수군') return false;
+  if (tt === 'keep') return false; // 본성은 돌파·밀어내기로 뛰어들 수 없다
+  return SG.T.moveCost(B, u, p[0], p[1]) < 99;
+};
+SG.T.pushChance = function (a, d) {
+  return SG.clamp(0.5 + 0.45 * (a.n - d.n) / Math.max(1, a.n + d.n) + (a.war - d.war) / 200 + (a.lead - d.lead) / 300, 0.15, 0.85);
+};
+SG.T.fireChance = function (B, a, d) {
+  var tt = B.map[SG.T.key(d.c, d.r)];
+  return SG.clamp(0.25 + (a.int - d.int) / 200 + (tt === 'forest' ? 0.2 : 0) - (tt === 'water' ? 0.4 : 0), 0.05, 0.7);
+};
 // 목표 옆에 붙어 있는 (공격자 말고) 아군 수
 SG.T.flankers = function (B, a, d) {
   return SG.T.neighbors(d.c, d.r).filter(function (nb) { var x = SG.T.at(B, nb[0], nb[1]); return x && x !== a && x.side === a.side && x.n > 0; }).length;
@@ -227,6 +252,9 @@ SG.T.formOk = function (B, a, d, form) {
   if (form === 'combo') return dist === 1 && a.war >= 80;
   if (form === 'volley') return a.t === 'arc';
   if (form === 'pincer') return dist === 1 && SG.T.flankers(B, a, d) > 0;
+  if (form === 'breach') return dist === 1 && a.t === 'cav' && SG.T.canEnter(B, a, SG.T.beyond(a, d));
+  if (form === 'push') return dist === 1 && a.t === 'inf';
+  if (form === 'firearrow') return a.t === 'arc';
   return true;
 };
 SG.T.formTargets = function (B, u, form) {
@@ -245,7 +273,10 @@ SG.T.formPlan = function (B, a, d, form, flat) {
   else if (form === 'volley') {
     hits.push([d, T.damage(B, a, d, 0.9, flat)]);
     T.neighbors(d.c, d.r).forEach(function (nb) { var x = T.at(B, nb[0], nb[1]); if (x && x.side !== a.side) hits.push([x, T.damage(B, a, x, 0.35, flat)]); });
-  } else if (form === 'pincer') { var k = Math.min(3, T.flankers(B, a, d)); hits.push([d, T.damage(B, a, d, 1 + 0.2 * k, flat)]); counter = Math.max(0, 1 - 0.3 * k); }
+  } else if (form === 'breach') { hits.push([d, T.damage(B, a, d, 1.2, flat)]); counter = 0.6; }
+  else if (form === 'push') { hits.push([d, T.damage(B, a, d, 1, flat)]); counter = 0.8; }
+  else if (form === 'firearrow') { hits.push([d, T.damage(B, a, d, 0.75, flat)]); counter = 0.6; }
+  else if (form === 'pincer') { var k = Math.min(3, T.flankers(B, a, d)); hits.push([d, T.damage(B, a, d, 1 + 0.2 * k, flat)]); counter = Math.max(0, 1 - 0.3 * k); }
   else { hits.push([d, T.damage(B, a, d, base, flat)]); counter = ranged ? 0 : 1; }
   return { hits: hits, counter: ranged ? 0 : counter * cm };
 };
@@ -258,6 +289,9 @@ SG.T.bestForm = function (B, a, d) {
     var dealt = p.hits.reduce(function (s, x) { return s + Math.min(x[0].n, x[1]); }, 0);
     var back = p.counter ? Math.min(a.n, SG.T.damage(B, d, a, p.counter, true)) : 0;
     var v = dealt - back * 0.8;
+    if (f === 'firearrow') v += SG.T.fireChance(B, a, d) * (d.n * 0.06 + 200);
+    if (f === 'breach') v += 150 + Math.min(d.n, 3000) * 0.04;
+    if (f === 'push') v += SG.T.pushChance(a, d) * 120 + (SG.T.canEnter(B, d, SG.T.beyond(a, d)) ? 0 : 0.4 * Math.min(d.n, SG.T.damage(B, a, d, 1, true)));
     if (v > bv) { bv = v; best = f; }
   });
   return best;
@@ -270,7 +304,7 @@ SG.T.attack = function (B, a, d, form) {
   B.lastHits = [];
   p.hits.forEach(function (x) { if (x[0].n <= 0) return; var got = T.hit(B, x[0], x[1]); done[x[0].id] = (done[x[0].id] || 0) + got; B.lastHits.push({ u: x[0], dmg: got }); });
   var main = done[d.id] || 0;
-  var verb = { charge: '에 돌격했다', combo: '을(를) 연달아 베었다', volley: '에 화살비를 퍼부었다', pincer: '을(를) 협공했다' }[form] || (ranged ? '을(를) 활로 쏘았다' : '을(를) 공격했다');
+  var verb = { charge: '에 돌격했다', combo: '을(를) 연달아 베었다', volley: '에 화살비를 퍼부었다', pincer: '을(를) 협공했다', breach: '을(를) 꿰뚫고 돌파했다', push: '을(를) 방패로 밀어붙였다', firearrow: '에 불화살을 쏘았다' }[form] || (ranged ? '을(를) 활로 쏘았다' : '을(를) 공격했다');
   msg = a.name + '이(가) ' + d.name + verb + ' (-' + SG.fmt(main) + ')';
   var side = B.lastHits.filter(function (x) { return x.u !== d; });
   if (side.length) msg += ', 옆 부대 ' + side.map(function (x) { return x.u.name + ' -' + SG.fmt(x.dmg); }).join(', ');
@@ -278,10 +312,45 @@ SG.T.attack = function (B, a, d, form) {
     var back = T.hit(B, a, Math.round(T.damage(B, d, a, p.counter)));
     msg += ', 반격 -' + SG.fmt(back);
   }
+  // 병종 전법의 뒷일
+  B.fxForm = null;
+  if (form === 'breach' && a.n > 0) {
+    var bp = T.beyond(a, d);
+    if (T.canEnter(B, a, bp)) {
+      B.fxForm = { kind: 'breach', from: [a.c, a.r], to: bp };
+      a.c = bp[0]; a.r = bp[1]; a.moved = true;
+      msg += ', 적진 뒤로 빠져나갔다';
+      if (d.n > 0 && SG.chance(SG.clamp(0.3 + (a.war - d.lead) / 200, 0.1, 0.6))) { d.conf = Math.max(d.conf, 1); msg += ' — ' + d.name + ' 부대가 흩어져 혼란!'; B.fxForm.conf = true; }
+    }
+  }
+  if (form === 'push' && d.n > 0 && a.n > 0) {
+    var pp = T.beyond(a, d), old = [d.c, d.r];
+    if (T.canEnter(B, d, pp) && SG.chance(T.pushChance(a, d))) {
+      d.c = pp[0]; d.r = pp[1];
+      if (T.canEnter(B, a, old)) { a.c = old[0]; a.r = old[1]; a.moved = true; }
+      msg += ', 한 칸 밀어냈다';
+      B.fxForm = { kind: 'push', ok: true };
+      T.moraleShift(B, a.side, 1);
+    } else {
+      var crush = T.hit(B, d, Math.round(T.damage(B, a, d, 0.4)));
+      done[d.id] += crush; B.lastHits[0].dmg += crush;
+      msg += ', 밀려날 곳이 없어 짓눌렸다 (-' + SG.fmt(crush) + ')';
+      B.fxForm = { kind: 'push', ok: false };
+    }
+  }
+  if (form === 'firearrow' && d.n > 0) {
+    if (SG.chance(T.fireChance(B, a, d))) {
+      var burn = T.hit(B, d, Math.round(d.n * SG.randf(0.04, 0.08) + a.int * 3));
+      done[d.id] += burn; B.lastHits[0].dmg += burn;
+      d.conf = Math.max(d.conf, 1);
+      msg += ', 불이 붙었다! (-' + SG.fmt(burn) + ', 혼란)';
+      B.fxForm = { kind: 'fire', ok: true };
+    } else { msg += ', 불은 붙지 않았다'; B.fxForm = { kind: 'fire', ok: false }; }
+  }
   if (d.n <= 0) msg += ' — ' + d.name + ' 부대 궤멸!';
   B.log.push(msg);
   a.done = true;
-  T.moraleShift(B, a.side, (d.n <= 0 ? 4 : 1) + (form === 'charge' ? 2 : 0));
+  T.moraleShift(B, a.side, (d.n <= 0 ? 4 : 1) + (form === 'charge' || form === 'breach' ? 2 : 0));
   T.checkEnd(B);
   return msg;
 };

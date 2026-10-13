@@ -385,6 +385,7 @@ SG.nearestOwn = function (fid, cid) {
 SG.handleCaptive = async function (oid, captor, cid) {
   var o = SG.S.off[oid], from = o.f;
   o.s = 'captive'; o.capt = captor; o.c = cid;
+  if (SG.seizeItems) SG.seizeItems(oid, captor);
   var choice;
   // 잡은 쪽이 도시를 모두 잃었으면 포로를 붙잡아 둘 곳이 없다 → 풀려남
   if (!SG.S.forces[captor] || !SG.S.forces[captor].alive || !SG.citiesOf(captor).length) choice = 'release';
@@ -438,6 +439,7 @@ SG.kill = function (oid, why) {
   var wasLord = o.s === 'force' && SG.S.forces[o.f] && SG.S.forces[o.f].lord === oid;
   o.s = 'dead'; o.diedAt = SG.S.year;
   SG.log(o.f, SG.name(oid) + '이(가) ' + why + '.', 'death');
+  if (SG.dropItems) SG.dropItems(oid);
   return wasLord;
 };
 

@@ -7,8 +7,7 @@ SG.UI.CMD_GROUPS = [
     { label: '농업 개발', run: function (cid) { return SG.UI.cmdDevelop(cid, 'agri'); } },
     { label: '상업 개발', run: function (cid) { return SG.UI.cmdDevelop(cid, 'comm'); } },
     { label: '성벽 보수', run: function (cid) { return SG.UI.cmdDevelop(cid, 'wall'); } },
-    { label: '민심 안정', run: function (cid) { return SG.UI.cmdRelief(cid); } },
-    { label: '교역', run: function (cid) { return SG.UI.cmdTrade(cid); } }
+    { label: '민심 안정', run: function (cid) { return SG.UI.cmdRelief(cid); } }
   ] },
   { name: '군사', items: [
     { label: '징병', run: function (cid) { return SG.UI.cmdConscript(cid); } },

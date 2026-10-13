@@ -12,14 +12,26 @@ SG.UI.cityBanner = function (cid, bw, bh, zoom) {
 };
 
 // 태수: 군주가 있으면 군주, 아니면 통솔+정치가 가장 높은 장수
-SG.UI.governor = function (cid) {
-  var c = SG.S.cities[cid];
-  if (!c.owner) return null;
-  var offs = SG.officersIn(cid, c.owner);
-  if (!offs.length) return null;
-  var lord = SG.S.forces[c.owner].lord;
-  if (offs.indexOf(lord) >= 0) return lord;
-  return offs.slice().sort(function (a, b) { return (SG.O(b).lead + SG.O(b).pol) - (SG.O(a).lead + SG.O(a).pol); })[0];
+SG.UI.governor = function (cid) { return SG.governor(cid); };
+// 태수 임명 창
+SG.UI.appointGov = async function (cid) {
+  var S = SG.S, c = S.cities[cid], offs = SG.officersIn(cid, c.owner), pick = null, cur = SG.governor(cid);
+  var body = h('div', null, [
+    h('p', { class: 'note', text: '태수의 정치가 높을수록 금 수입·가을걷이가 늘고(정치 60 기준, 100 이면 +10%, 20 이면 −10%), 매력이 80 이상이면 민심이 달마다 1씩 오릅니다. 위임하면 태수가 이 도시를 맡아 다스립니다. 새로 임명된 장수는 충성 +5. 명령 횟수는 쓰지 않습니다.' }),
+    h('div', { class: 'pick-list' }, [SG.UI.officerTable(offs, {
+      sortBy: { get: function (o) { return SG.O(o).pol * 2 + SG.O(o).cha; } },
+      cols: [{ label: '수입', cls: 'n', get: function (o) { var r = Math.round((SG.O(o).pol - 60) / 4); return (r >= 0 ? '+' : '') + r + '%'; } },
+        { label: '민심', cls: 'n', get: function (o) { return SG.O(o).cha >= 80 ? '+1' : '·'; } },
+        { label: '지금', cls: 'n', get: function (o) { return o === cur ? '태수' : ''; } }],
+      onPick: function (o) { pick = o; var b = document.querySelector('#modal-root .back:last-child .modal-f .btn'); if (b) b.click(); }
+    })])
+  ]);
+  await SG.UI.modal({ title: '태수 임명 — ' + SG.cityName(cid) + '을(를) 누구에게 맡길까요?', icon: 'officer', body: body, cancel: true, buttons: [{ label: '닫기', value: true }] });
+  if (!pick || pick === cur) return;
+  var r = SG.appoint(cid, pick);
+  SG.UI.toast(r.msg, !r.ok);
+  if (r.ok) SG.UI.sfx('recruit');
+  SG.UI.refresh();
 };
 
 SG.UI.mood = function (v) {
@@ -61,13 +73,16 @@ SG.UI.renderPanel = function (el, cid) {
 
   // ---- 태수 + 상태
   var gov = SG.UI.governor(cid), md = SG.UI.mood(c.loyal), th = c.owner ? SG.threat(cid) : null;
+  var canAppoint = mine && gov && gov !== f.lord && SG.officersIn(cid, c.owner).length > 1;
+  var gr = gov ? Math.round((SG.govRate(cid) - 1) * 100) : 0;
   var govRow = h('div', { class: 'gov' }, [
     gov ? SG.UI.portrait(gov, 64) : h('span', { class: 'pt gov-empty', style: { width: '64px', height: '64px', background: '#66706b', fontSize: '28px' } }, ['空']),
     h('div', { class: 'gov-info' }, [
       h('div', { class: 'gov-role', text: gov ? (f && f.lord === gov ? '군주' : '태수') : '태수 없음' }),
-      h('div', { class: 'gov-name', text: gov ? SG.name(gov) : '—' }),
+      h('div', { class: 'gov-name' }, [gov ? SG.name(gov) : '—', canAppoint ? h('button', { class: 'btn small gov-btn', type: 'button', text: '태수 임명', onclick: function (e) { e.stopPropagation(); SG.UI.appointGov(cid); } }) : null]),
       h('div', { class: 'gov-chips' }, [
         h('span', { class: 'chip ' + md[1], text: '민심 ' + md[0] }),
+        gov ? h('span', { class: 'chip ' + (gr > 0 ? 'good' : gr < 0 ? 'warn' : ''), title: '태수의 정치에 따라 금 수입·가을걷이가 달라집니다', text: '다스림 ' + (gr >= 0 ? '+' : '') + gr + '%' + (SG.O(gov).cha >= 80 ? ' · 민심↑' : '') }) : null,
         th && th.front ? h('span', { class: 'chip ' + (th.max > c.soldiers ? 'bad' : 'warn'), text: th.max > c.soldiers ? '적이 더 많음' : '적과 맞닿음' }) : (c.owner ? h('span', { class: 'chip good', text: '후방' }) : null)
       ])
     ])
@@ -196,6 +211,7 @@ SG.UI.officerCards = function (oids, opt) {
     var card = h('button', { class: 'ocard' + (done ? ' done' : '') + (dim ? ' dim' : '') + (sel ? ' sel' : '') + (mk ? ' marked' + (mk.just ? ' just' : '') : ''), type: 'button', disabled: dim || null, title: o.n + ' — 통' + o.lead + ' 무' + o.war + ' 지' + o.int + ' 정' + o.pol + ' 매' + o.cha }, [
       h('div', { class: 'oc-face' }, [SG.UI.portrait(oid, opt.big ? 84 : 58), done ? h('span', { class: 'oc-stamp', text: '完' }) : null, isLord ? h('span', { class: 'oc-lord', text: '君' }) : null]),
       mk ? h('span', { class: 'oc-mark' + (mk.up ? '' : ' down'), text: mk.tag[0] }) : null,
+      o.items ? h('span', { class: 'oc-item', title: o.items.map(SG.itemName).join(', ') }, [SG.UI.itemImg(o.items[0], 22), o.items.length > 1 ? h('b', { text: o.items.length }) : null]) : null,
       h('div', { class: 'oc-name', text: o.n }),
       mk ? h('div', { class: 'oc-markt' + (mk.up ? '' : ' down'), text: mk.tag[1] }) : null,
       st ? h('div', { class: 'oc-stat' + (st.hi ? ' hi' : '') }, [h('span', { text: st.label }), h('b', { text: st.value })])
@@ -234,7 +250,8 @@ SG.UI.officerCard = function (oid) {
   var icons = ['flag', 'attack', 'scroll', 'comm', 'people'];
   var rows = SG.STAT_NAMES.map(function (n, i) {
     var v = vals[i];
-    return h('div', { class: 'meter big' }, [SG.UI.icon(icons[i], 16), h('span', { class: 'meter-k', text: n }), SG.UI.bar(v, 100, ['b', 'r', 'g', '', 'r'][i]), h('span', { class: 'meter-v ' + SG.UI.statClass(v), text: v })]);
+    var bn = o.bonus && o.bonus[SG.STAT_KEYS[i]];
+    return h('div', { class: 'meter big' }, [SG.UI.icon(icons[i], 16), h('span', { class: 'meter-k', text: n }), SG.UI.bar(v, 100, ['b', 'r', 'g', '', 'r'][i]), h('span', { class: 'meter-v ' + SG.UI.statClass(v) }, [String(v), bn ? h('small', { class: 'it-plus', title: '보물 덕분', text: '+' + bn }) : null])]);
   });
   var best = vals.indexOf(Math.max.apply(null, vals));
   var role = o.war >= 85 && o.war >= o.int ? '맹장' : o.int >= 85 ? '책사' : o.lead >= 80 ? '장수' : o.pol >= 75 ? '문관' : o.war >= 70 ? '무관' : '관리';
@@ -256,7 +273,8 @@ SG.UI.officerCard = function (oid) {
         o.fa ? h('div', { class: 'note', text: '아버지: ' + SG.name(o.fa) }) : null
       ])
     ]),
-    h('div', { class: 'oc-stats' }, [SG.UI.radar(vals, 210, col), h('div', { class: 'meters' }, rows)])
+    h('div', { class: 'oc-stats' }, [SG.UI.radar(vals, 210, col), h('div', { class: 'meters' }, rows)]),
+    SG.UI.officerItems ? SG.UI.officerItems(oid, function () { var b = document.querySelector('#modal-root .back:last-child .modal-f .btn'); if (b) b.click(); }) : null
   ]);
   return SG.UI.modal({ title: '장수 정보 — ' + o.n, icon: 'officer', body: body, cancel: true });
 };

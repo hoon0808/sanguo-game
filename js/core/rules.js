@@ -103,15 +103,37 @@ SG.cmd.search = function (cid, oid) {
   hidden.forEach(function (x) {
     if (SG.chance(0.25 + (o.int + o.cha) / 300)) { SG.S.off[x].found = true; found.push(x); }
   });
+  // 보물·명마: 이 도시에 숨겨진 것이 있으면 찾을 수 있다
+  var item = null, hid = SG.hiddenItems ? SG.hiddenItems(cid) : [];
+  if (hid.length && SG.chance(0.3 + (o.int + o.cha) / 500)) {
+    item = hid[SG.randInt(0, hid.length - 1)];
+    SG.giveItem(item, oid);
+    var so = SG.S.off[oid];
+    if (so.s === 'force' && SG.S.forces[so.f].lord !== oid) so.loy = Math.min(100, so.loy + 5);
+  }
+  var itTxt = item ? SG.itemName(item) + '(' + SG.ITEMS[item].h + ')' : '';
+  if (found.length && item) return done(oid, SG.name(oid) + '이(가) 인재 ' + found.map(SG.name).join(', ') + '을(를) 찾아냈고, ' + itTxt + '까지 손에 넣었다!', { found: found, item: item });
+  if (item) return done(oid, SG.name(oid) + '이(가) ' + itTxt + '을(를) 찾아냈다!', { found: [], item: item });
   if (found.length) {
     return done(oid, SG.name(oid) + '이(가) 인재 ' + found.map(SG.name).join(', ') + '을(를) 찾아냈다!', { found: found });
   }
   var r = SG.rand();
-  if (r < 0.25) {
+  // 다른 곳에 숨은 보물 소문 (가까운 도시부터)
+  if (r < 0.15 && SG.hiddenItems) {
+    var near = [cid], seen = {}, rum = null;
+    seen[cid] = true;
+    for (var i = 0; i < near.length && !rum; i++) {
+      var hs = SG.hiddenItems(near[i]);
+      if (hs.length && near[i] !== cid) rum = [near[i], hs[0]];
+      (SG.ADJ[near[i]] || []).forEach(function (n) { if (!seen[n]) { seen[n] = true; near.push(n); } });
+    }
+    if (rum) return done(oid, SG.name(oid) + '이(가) 「' + SG.cityName(rum[0]) + '에 ' + SG.ITEM_KIND[SG.ITEMS[rum[1]].k] + '이(가) 숨겨져 있다」는 소문을 들었다.', { found: [], rumor: rum[0], rumorItem: rum[1] });
+  }
+  if (r < 0.38) {
     var g = SG.randInt(50, 150); c.gold += g;
     return done(oid, SG.name(oid) + '이(가) 인재는 찾지 못했지만 금 ' + g + '을(를) 얻었다.', { found: [] });
   }
-  if (r < 0.45) {
+  if (r < 0.56) {
     var f = SG.randInt(200, 500); c.food += f;
     return done(oid, SG.name(oid) + '이(가) 인재는 찾지 못했지만 식량 ' + f + '을(를) 얻었다.', { found: [] });
   }

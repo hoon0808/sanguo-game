@@ -99,9 +99,10 @@ SG.UI.renderTop = function () {
   }
   top.appendChild(h('div', { class: 'sp' }));
   var menuItems = (SG.UI.isCompact() ? [
-    ['장수 일람', SG.UI.officerList], ['세력 일람', SG.UI.forceList], ['저장', function () { SG.UI.saveLoad('save'); }], ['기록 보기', SG.UI.showLog]
+    ['장수 일람', SG.UI.officerList], ['세력 일람', SG.UI.forceList], ['보물 일람', SG.UI.itemList], ['저장', function () { SG.UI.saveLoad('save'); }], ['기록 보기', SG.UI.showLog]
   ].concat(SG.UI.canFullscreen() ? [['전체 화면 켜기/끄기', SG.UI.toggleFullscreen]] : []) : []).concat([
-    ['불러오기', function () { SG.UI.saveLoad('load'); }],
+    ['불러오기', function () { SG.UI.saveLoad('load'); }]
+  ]).concat(SG.UI.isCompact() ? [] : [['보물 일람', SG.UI.itemList]]).concat([
     ['내 본거지 보기', function () { SG.UI.state.sel = S.forces[S.player].capital; SG.UI.refresh(); }],
     ['지도 전체 보기', function () { SG.UI.state.map.fit(); }],
     [SG.UI.themeLabel(), function () { SG.UI.cycleTheme(); }],

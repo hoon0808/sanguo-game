@@ -248,6 +248,12 @@ SG.UI.tactical = function (atk, def) {
       var tx = S2('text', { y: -6, 'text-anchor': 'middle', class: 'broke-char' }, g); tx.textContent = '潰';
       shake(true);
     }
+    // 돌파: 지나간 길에 흙먼지
+    function dustTrail(from, to) {
+      var pa = at({ c: from[0], r: from[1] }), pb = at({ c: to[0], r: to[1] }), g = fxGroup({ x: 0, y: 0 }, 'fx-breach', 1100);
+      S2('path', { d: 'M' + pa.x + ',' + pa.y + ' L' + pb.x + ',' + pb.y, class: 'breach-line' }, g);
+      for (var i = 0; i < 5; i++) { var k = (i + 0.5) / 5; S2('circle', { cx: pa.x + (pb.x - pa.x) * k, cy: pa.y + (pb.y - pa.y) * k + 6, r: 9, class: 'smoke', style: 'animation-delay:' + (i * 80) + 'ms' }, g); }
+    }
     function lunge(a, t) {
       var pa = at(a), pt = at(t);
       var dx = pt.x - pa.x, dy = pt.y - pa.y, d = Math.sqrt(dx * dx + dy * dy) || 1, k = Math.min(20, d * 0.42) / d;
@@ -258,9 +264,16 @@ SG.UI.tactical = function (atk, def) {
     // 공격 연출 한 번에
     function attackFx(a, t, before, form) {
       var ranged = SG.T.dist([a.c, a.r], [t.c, t.r]) > 1;
-      SG.UI.sfx(ranged || form === 'volley' ? 'arrow' : form === 'charge' ? 'broken' : 'clash');
-      if (ranged || form === 'volley') { volley(a, t); (B.lastHits || []).forEach(function (hh) { if (hh.u !== t) volley(a, hh.u); }); }
-      else { lunge(a, t); slash(t); if (form === 'combo') setTimeout(function () { SG.UI.sfx('clash'); lunge(a, t); slash(t); redraw(); }, 380); }
+      var ff = B.fxForm || {};
+      SG.UI.sfx(ranged || form === 'volley' || form === 'firearrow' ? 'arrow' : form === 'charge' || form === 'breach' ? 'broken' : 'clash');
+      if (ranged || form === 'volley' || form === 'firearrow') {
+        volley(a, t); (B.lastHits || []).forEach(function (hh) { if (hh.u !== t) volley(a, hh.u); });
+        if (ff.kind === 'fire' && ff.ok) setTimeout(function () { SG.UI.sfx('fire'); flames(t); confuse(t); }, 380);
+      } else if (ff.kind === 'breach') {
+        slash(t); dustTrail(ff.from, ff.to); shake(false);
+        if (ff.conf) setTimeout(function () { confuse(t); }, 300);
+      } else { lunge(a, t); slash(t); if (form === 'combo') setTimeout(function () { SG.UI.sfx('clash'); lunge(a, t); slash(t); redraw(); }, 380); }
+      if (ff.kind === 'push') setTimeout(function () { flash(t, ff.ok ? '밀려남!' : '짓눌림!'); if (!ff.ok) shake(false); }, 250);
       var lost = before - t.n;
       if (t.n <= 0) { setTimeout(function () { broken(t); }, ranged ? 420 : 150); SG.UI.sfx('broken'); }
       else if (lost > t.max * 0.12) shake(false);
@@ -358,9 +371,9 @@ SG.UI.tactical = function (atk, def) {
           var formsEl = null;
           if (st.mode === 'attack') {
             var okF = SG.T.formsOf(B, u);
-            formsEl = h('div', { class: 'bt-forms' }, [h('div', { class: 'bf-row' }, SG.T.FORM_KEYS.map(function (f) {
+            formsEl = h('div', { class: 'bt-forms' }, [h('div', { class: 'bf-row' }, SG.T.FORM_KEYS.filter(function (f) { return !SG.T.FORMS[f].t || SG.T.FORMS[f].t === u.t; }).map(function (f) {
               var F = SG.T.FORMS[f], ok = okF.indexOf(f) >= 0;
-              return h('button', { class: 'bf' + (st.form === f ? ' on' : ''), type: 'button', disabled: !ok || null, title: F.desc, onclick: function () { st.form = f; redraw(); } },
+              return h('button', { class: 'bf' + (st.form === f ? ' on' : '') + (F.t ? ' troop' : ''), type: 'button', disabled: !ok || null, title: F.desc, onclick: function () { st.form = f; redraw(); } },
                 [h('i', { text: F.h }), h('span', { text: F.n })]);
             })), h('p', { class: 'bf-desc', text: SG.T.FORMS[st.form].desc })]);
           }

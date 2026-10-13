@@ -44,10 +44,40 @@ SG.UI.CMD_TITLE = { locust: '메뚜기 떼', plague: '역병', flood: '홍수', 
 // ---- 배경 그림
 SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drought: 'field', plague: 'village', riot: 'village', quake: 'wall' };
 // 그린 배경 그림이 있는 장면 (img/scene/<이름>.jpg, Higgsfield 로 그림). 없으면 아래 SVG 로 그린다
-SG.UI.SCENE_IMG = { field: 1, market: 1, wall: 1, village: 1, drill: 1, road: 1, night: 1 };
-// 처음 장면이 열릴 때 그림이 늦게 뜨지 않도록 미리 받아 둔다
+SG.UI.SCENE_IMG = { field: 1, market: 1, wall: 1, village: 1, drill: 1, road: 1, night: 1,
+  field2: 1, field3: 1, market2: 1, market3: 1, trade1: 1, trade2: 1, wall2: 1, wall3: 1, village2: 1, village3: 1,
+  drill2: 1, drill3: 1, drill4: 1, road2: 1, road3: 1, road4: 1, road5: 1, road6: 1, night2: 1, night3: 1 };
+// 명령마다 그림 여러 장을 돌아가며 보여 준다 (같은 명령을 연달아 내려도 다른 그림)
+SG.UI.CMD_IMGS = {
+  agri: ['field', 'field2', 'field3'], comm: ['market', 'market2', 'market3'], trade: ['trade1', 'trade2', 'market2'],
+  wall: ['wall', 'wall2', 'wall3'], relief: ['village', 'village2', 'village3'],
+  conscript: ['drill2', 'drill', 'drill4'], train: ['drill', 'drill3', 'drill4'],
+  search: ['road', 'road2', 'road3'], recruit: ['road4', 'road2', 'road3'], move: ['road', 'road5'], transport: ['road6', 'road5'],
+  rumor: ['night', 'night2', 'night3'], sow: ['night2', 'night3', 'night'],
+  reward: ['hall', 'hall2'], gift: ['hall2', 'hall3', 'hall'], ally: ['hall3', 'hall'], demand: ['hall', 'hall2']
+};
+SG.UI._imgNext = {};
+function sceneNext(kind) {
+  var L = SG.UI.CMD_IMGS[kind];
+  if (SG.UI._imgNext[kind] == null) SG.UI._imgNext[kind] = Math.floor(Math.random() * L.length);
+  return L[SG.UI._imgNext[kind] % L.length];
+}
+function preloadScene(k) { (new Image()).src = 'img/scene/' + k + '.jpg'; }
+// 이번에 쓸 그림을 고르고, 다음 그림을 미리 받아 둔다
+SG.UI.sceneImg = function (kind, bg) {
+  if (!SG.UI.CMD_IMGS[kind]) return bg;
+  var k = sceneNext(kind);
+  SG.UI._imgNext[kind]++;
+  preloadScene(sceneNext(kind));
+  return k;
+};
+// 처음 장면이 열릴 때 그림이 늦게 뜨지 않도록 명령마다 첫 그림을 미리 받아 둔다
 window.addEventListener('load', function () {
-  setTimeout(function () { Object.keys(SG.UI.SCENE_IMG).concat(['hall', 'audience']).forEach(function (k) { (new Image()).src = 'img/scene/' + k + '.jpg'; }); }, 1500);
+  setTimeout(function () {
+    var seen = { audience: 1 };
+    Object.keys(SG.UI.CMD_IMGS).forEach(function (kind) { seen[sceneNext(kind)] = 1; });
+    Object.keys(seen).forEach(preloadScene);
+  }, 1500);
 });
 SG.UI.sceneBackdrop = function (bg0, color) {
   var bg = SG.UI.DISASTER_BASE[bg0] || bg0;
@@ -196,7 +226,7 @@ SG.UI.diff = function (o, a) {
 SG.UI.resultCard = function (o, r, rows) {
   var ok = r.success !== false;
   var card = h('div', { class: 'res-card ' + (ok ? 'ok' : 'ng') }, [
-    h('div', { class: 'rc-head' }, [h('span', { class: 'rc-stamp', text: r.stamp || (o.kind === 'attack' ? (ok ? '勝' : '敗') : (ok ? '成' : '敗')) }), h('div', null, [h('b', { text: r.title || ((SG.UI.CMD_TITLE[o.kind] || '명령') + (ok ? ' 완료' : ' 실패')) }), h('small', { text: r.msg })])]),
+    h('div', { class: 'rc-head' }, [h('span', { class: 'rc-stamp', text: r.stamp || (r.item ? '寶' : '') || (o.kind === 'attack' ? (ok ? '勝' : '敗') : (ok ? '成' : '敗')) }), h('div', null, [h('b', { text: r.title || (r.item ? SG.ITEM_KIND[SG.ITEMS[r.item].k] + ' 발견!' : '') || ((SG.UI.CMD_TITLE[o.kind] || '명령') + (ok ? ' 완료' : ' 실패')) }), h('small', { text: r.msg })])]),
     rows.length ? h('div', { class: 'rc-rows' }, rows.slice(0, 7).map(function (x, i) {
       var row = h('div', { class: 'rc-row', style: { animationDelay: (0.15 + i * 0.1) + 's' } }, [
         x.oid ? SG.UI.portrait(x.oid, 30) : null, h('span', { class: 'rc-k', text: x.label })]);
@@ -216,6 +246,7 @@ SG.UI.resultCard = function (o, r, rows) {
       }
       return row;
     })) : null,
+    r.item ? h('div', { class: 'rc-item k-' + SG.ITEMS[r.item].k }, [SG.UI.itemImg(r.item, 96), h('div', null, [h('b', null, [h('span', { class: 'it-kind', text: SG.ITEM_KIND[SG.ITEMS[r.item].k] }), SG.ITEMS[r.item].n, h('small', { text: ' ' + SG.ITEMS[r.item].h })]), h('span', { class: 'it-bonus', text: SG.itemBonusText(r.item) }), h('span', { class: 'it-desc', text: SG.ITEMS[r.item].d })])]) : null,
     (r.found && r.found.length) ? h('div', { class: 'rc-found' }, r.found.map(function (oid) { return h('div', null, [SG.UI.portrait(oid, 64), h('span', { text: SG.name(oid) })]); })) : null
   ]);
   return card;
@@ -272,11 +303,11 @@ SG.UI.cmdScene = function (o, r, rows, meta) {
   var o2 = SG.O(speaker), line = meta.lines[(o2.int + o2.war) % meta.lines.length];
   var txt = h('div', { class: 'dlg-t' });
   var dlg = h('div', { class: 'dlg' }, [h('div', { class: 'dlg-who' }, [o2.n, h('small', { text: SG.forceName(P) + ' · ' + SG.cityName(o.cid) })]), txt, h('i', { class: 'dlg-more' })]);
-  var bgEl;
+  var bgEl, pic = SG.UI.sceneImg(o.kind, meta.bg);
   if (meta.bg === 'hall') {
     var curtain = h('div', { class: 'hall-curtain' }); curtain.style.setProperty('--host', F.color);
-    bgEl = h('div', { class: 'cs-hall' }, [h('div', { class: 'hall-bg', style: { backgroundImage: 'url(img/scene/hall.jpg)' } }), curtain]);
-  } else bgEl = h('div', { class: 'cs-sky', html: SG.UI.sceneBackdrop(meta.bg, F.color) });
+    bgEl = h('div', { class: 'cs-hall' }, [h('div', { class: 'hall-bg', style: { backgroundImage: 'url(img/scene/' + pic + '.jpg)' } }), curtain]);
+  } else bgEl = h('div', { class: 'cs-sky', html: SG.UI.sceneBackdrop(pic, F.color) });
   var card = SG.UI.resultCard(o, r, rows);
   var stage = h('div', { class: 'cmd-scene bg-' + meta.bg }, [bgEl,
     h('div', { class: 'cs-who' }, [SG.UI.portrait(speaker, 210, P), h('div', { class: 'v-name' }, [o2.n, h('small', { text: SG.UI.CMD_TITLE[o.kind] })])]),

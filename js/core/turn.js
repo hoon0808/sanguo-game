@@ -1,13 +1,43 @@
 // 한 달 진행: 컴퓨터 세력 행동 → 다음 달 (수입·수확·식량·충성·나이·사건)
 var SG = SG || {};
 
+// 태수: 군주가 그 도시에 있으면 군주, 임명한 태수(c.gov)가 있으면 그 장수, 아니면 통솔+정치가 가장 높은 장수
+SG.governor = function (cid) {
+  var c = SG.S.cities[cid];
+  if (!c.owner) return null;
+  var offs = SG.officersIn(cid, c.owner);
+  if (!offs.length) return null;
+  var lord = SG.S.forces[c.owner].lord;
+  if (offs.indexOf(lord) >= 0) return lord;
+  if (c.gov && offs.indexOf(c.gov) >= 0) return c.gov;
+  return offs.slice().sort(function (a, b) { return (SG.O(b).lead + SG.O(b).pol) - (SG.O(a).lead + SG.O(a).pol); })[0];
+};
+// 태수의 정치가 수입·수확을 늘리거나 줄인다 (정치 60 기준, 100 이면 +10%, 20 이면 −10%)
+SG.govRate = function (cid) {
+  var g = SG.governor(cid);
+  return g ? 1 + (SG.O(g).pol - 60) / 400 : 0.9;
+};
+// 태수 임명 (명령 횟수는 쓰지 않는다)
+SG.cmd = SG.cmd || {};
+SG.appoint = function (cid, oid) {
+  var c = SG.S.cities[cid], t = SG.S.off[oid];
+  if (!c.owner || !t || t.s !== 'force' || t.f !== c.owner || t.c !== cid) return { ok: false, msg: '이 도시의 우리 장수만 태수로 임명할 수 있습니다' };
+  var lord = SG.S.forces[c.owner].lord;
+  if (SG.officersIn(cid, c.owner).indexOf(lord) >= 0) return { ok: false, msg: '군주가 머무는 도시는 군주가 직접 다스립니다' };
+  var was = SG.governor(cid), g = 0;
+  c.gov = oid;
+  if (was !== oid && oid !== lord) { g = Math.min(5, 100 - t.loy); t.loy += g; }
+  var msg = SG.name(oid) + '을(를) ' + SG.cityName(cid) + ' 태수로 임명했다.' + (g ? ' 충성 +' + g : '');
+  SG.log(c.owner, msg, 'staff');
+  return { ok: true, msg: SG.josa(msg), gain: g };
+};
 SG.income = function (cid) {
   var c = SG.S.cities[cid];
-  return Math.round((c.comm * 0.12 + c.pop / 12000) * (0.5 + c.loyal / 200));
+  return Math.round((c.comm * 0.12 + c.pop / 12000) * (0.5 + c.loyal / 200) * SG.govRate(cid));
 };
 SG.harvest = function (cid) {
   var c = SG.S.cities[cid];
-  return Math.round((c.agri * 5 + c.pop / 400) * (0.5 + c.loyal / 200));
+  return Math.round((c.agri * 5 + c.pop / 400) * (0.5 + c.loyal / 200) * SG.govRate(cid));
 };
 SG.HARVEST_MONTH = 7;
 
@@ -108,6 +138,9 @@ SG.nextMonth = async function () {
     var maxPop = SG.CITY_SIZE[SG.CITIES[cid].size].pop * 1.6;
     c.pop = Math.min(maxPop, Math.round(c.pop * (1 + (c.loyal - 35) / 25000)));
     if (c.morale < c.train) c.morale = Math.min(c.train, c.morale + 1);
+    // 매력 높은 태수는 백성을 다독인다
+    var gv = SG.governor(cid);
+    if (gv && SG.O(gv).cha >= 80 && c.loyal < 100) c.loyal++;
   });
   if (S.month === SG.HARVEST_MONTH && S.player) SG.log(S.player, '가을걷이로 각 도시에 식량이 들어왔다.', 'sys');
 

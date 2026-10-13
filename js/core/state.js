@@ -168,7 +168,7 @@ SG.saveSlot = function (slot) {
   localStorage.setItem(SG.SAVE_KEY + slot + '_meta', JSON.stringify({
     y: SG.S.year, m: SG.S.month, lord: SG.S.player ? SG.forceName(SG.S.player) : '관전', t: Date.now(),
     lid: SG.S.player ? SG.S.forces[SG.S.player].lord : null, scen: SG.S.scen,
-    cities: SG.S.player ? SG.citiesOf(SG.S.player).length : 0
+    cities: SG.S.player ? SG.citiesOf(SG.S.player).length : 0, diff: SG.S.diff || 'easy'
   }));
 };
 SG.loadSlot = function (slot) {

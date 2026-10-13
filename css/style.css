@@ -1509,3 +1509,25 @@ html.compact .coop-chip .pt { width: 24px !important; height: 24px !important; }
 .rw-item small { font-size: 11px; color: var(--muted); }
 .rw-item.on { border-color: var(--brz); box-shadow: 0 0 0 1px var(--brz); background: linear-gradient(180deg, #fff6dc, #f0dda9); color: #2e2415; }
 .rw-item i { position: absolute; right: -5px; top: -6px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--good); color: #fff; font-style: normal; font-size: 11px; }
+
+/* ---- 난이도 고르기 (타이틀·게임 중) */
+.t-diff { display: flex; flex-direction: column; gap: 6px; max-width: 460px; }
+.t-diff-h { display: flex; align-items: baseline; gap: 10px; }
+.t-diff-h b { font-family: var(--f-display); font-size: 16px; }
+.t-diff-h small { font-size: 12px; color: var(--muted); }
+.diff-pick { display: flex; flex-direction: column; gap: 6px; }
+.diff-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.diff-b { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 6px; border: 1px solid var(--line); border-radius: 4px; background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.diff-b i { font-style: normal; font-family: var(--f-display); width: 24px; height: 24px; display: grid; place-items: center; border-radius: 3px; font-size: 14px; color: #f6dfa0; background: #6b5a3a; }
+.diff-b.d-easy i { background: #3d6b4a; } .diff-b.d-normal i { background: #2c5a7a; } .diff-b.d-hard i { background: #8e2c22; } .diff-b.d-hell i { background: #2a1210; box-shadow: inset 0 0 0 1px #b2382c; }
+.diff-b.on { border-color: var(--brz); background: linear-gradient(180deg, #fff6dc, #f0dda9); color: #2e2415; box-shadow: 0 0 0 1px var(--brz); }
+.diff-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); min-height: 2.9em; }
+.ld-gdiff { margin-left: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(176, 138, 62, .16); font-size: 12px; font-weight: 600; }
+html.compact .diff-b { padding: 6px 4px; font-size: 12px; }
+html.compact .diff-b i { width: 20px; height: 20px; font-size: 12px; }
+html.compact .t-diff-h small, html.compact .diff-desc { display: none; }
+.diff-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.t-diff { width: 100%; min-width: 0; }
+.diff-b { min-width: 0; white-space: nowrap; }
+@media (max-width: 520px) { .diff-b i { display: none; } }
+.t-diff { max-width: min(460px, calc(100vw - 44px)); }

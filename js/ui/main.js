@@ -107,6 +107,7 @@ SG.UI.renderTop = function () {
     ['지도 전체 보기', function () { SG.UI.state.map.fit(); }],
     [SG.UI.themeLabel(), function () { SG.UI.cycleTheme(); }],
     ['소리 설정', SG.UI.soundSettings],
+    ['난이도: ' + SG.DIFFS[SG.diffKey()].n + ' (바꾸기)', SG.UI.changeDiff],
     [SG.UI.scenesOn() ? '명령 장면: 보기 (끄기)' : '명령 장면: 꺼짐 (켜기)', function () { SG.UI.setScenes(!SG.UI.scenesOn()); SG.UI.toast(SG.UI.scenesOn() ? '명령마다 장면을 봅니다' : '명령 장면을 끕니다. 결과는 가운데에 잠깐 보입니다'); SG.UI.refresh(); }],
     [SG.UI.briefOn() ? '참모 보고: 매달 보기 (끄기)' : '참모 보고: 꺼짐 (켜기)', function () { SG.UI.setBrief(!SG.UI.briefOn()); SG.UI.toast(SG.UI.briefOn() ? '달마다 참모 보고를 봅니다' : '참모 보고를 끕니다. 위쪽 「참모」로 언제든 볼 수 있습니다'); SG.UI.refresh(); }],
     ['도움말', SG.UI.help],

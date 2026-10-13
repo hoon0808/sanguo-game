@@ -125,8 +125,9 @@ SG.nextMonth = async function () {
       c.loyal = Math.min(70, c.loyal + 1);
       return;
     }
-    c.gold += SG.income(cid);
-    if (S.month === SG.HARVEST_MONTH) c.food += SG.harvest(cid);
+    var dm = SG.aiMul ? SG.aiMul(c.owner, 'inc') : 1;
+    c.gold += Math.round(SG.income(cid) * dm);
+    if (S.month === SG.HARVEST_MONTH) c.food += Math.round(SG.harvest(cid) * dm);
     var need = Math.ceil(c.soldiers / 100);
     if (c.food >= need) c.food -= need;
     else {
@@ -156,6 +157,8 @@ SG.nextMonth = async function () {
       var lord = SG.O(f.lord);
       o.loy = SG.clamp(o.loy + Math.round((lord.cha - 65) / 12) + SG.randInt(-2, 1), 0, 100);
     }
+    // 어려운 난이도: 우리 장수 충성이 조금씩 떨어진다
+    if (SG.diff && o.f === S.player && SG.chance(SG.diff().loyDrop)) o.loy = Math.max(0, o.loy - 1);
     if (o.loy < 35 && SG.chance(0.06)) leaving.push(oid);
   });
   for (var li = 0; li < leaving.length; li++) {

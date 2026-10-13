@@ -24,7 +24,7 @@ SG.AI.city = function (cid) {
   if (c.loyal < 45 && c.food >= 800) add('relief', 'cha', function (o) { return SG.cmd.relief(cid, o); }, 1.5);
   var want = th.front ? Math.max(th.max, 7000 + size * 4000) : 3000 + size * 1000;
   var foodCap = (c.food + c.agri * 5) * 100 / 10;
-  want = Math.min(want, foodCap, 60000);
+  want = Math.min(want * (SG.aiMul ? SG.aiMul(fid, 'army') : 1), foodCap, 60000);
   if (c.soldiers < want && c.gold >= 200 && c.loyal >= 35) add('conscript', 'cha', function (o) { return SG.cmd.conscript(cid, o, null, SG.aiTroopType(cid)); }, 1.5);
   if (c.soldiers > 2000 && c.train < (th.front ? 80 : 60)) add('train', 'lead', function (o) { return SG.cmd.train(cid, o); }, 1.2);
   // 교역: 식량이 모자라면 금으로 사고, 식량이 남아도는데 금이 없으면 판다
@@ -115,7 +115,7 @@ SG.AI.military = async function (fid, domesticOnly) {
 
   // 공격
   var attacked = {};
-  var need = 1.25 + SG.rand() * 0.3; // 이번 달의 공격 기준 (병력 비율)
+  var need = 1.25 + SG.rand() * 0.3 + (SG.isAI && SG.isAI(fid) ? SG.diff().need : 0); // 이번 달의 공격 기준 (병력 비율, 어려울수록 과감)
   cities = SG.shuffle(SG.citiesOf(fid));
   for (var i = 0; i < cities.length; i++) {
     var cid = cities[i], c = SG.S.cities[cid];
@@ -155,7 +155,7 @@ SG.AI.military = async function (fid, domesticOnly) {
       if (!t.owner) return;
       var dp = SG.AI.cityDefense(n) + 1;
       var ratio = myP / dp;
-      var score = ratio * (1 + SG.CITIES[n].size * 0.1) * (SG.isPlayer(t.owner) ? 0.95 : 1);
+      var score = ratio * (1 + SG.CITIES[n].size * 0.1) * (SG.isPlayer(t.owner) ? (SG.diff ? SG.diff().hunt : 0.95) : 1);
       if (ratio > need && score > bestScore) { best = n; bestScore = score; }
     });
     if (best && plan.length) {

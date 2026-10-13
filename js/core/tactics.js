@@ -186,6 +186,7 @@ SG.T.damage = function (B, a, d, mult, flat) {
   var tr = B.train[a.side], mo = B.morale[a.side];
   var dmg = a.n * 0.12 * ratio * (0.6 + tr / 250) * (0.6 + mo / 250) * (mult || 1);
   if (a.sk === '돌격') dmg *= 1.15;
+  if (SG.aiMul) dmg *= SG.aiMul(a.side === 'atk' ? B.atk.fid : B.def.fid, 'power');
   // 병종: 상성, 잘 다루는 병종, 기병 돌격(움직인 뒤 공격), 성 안을 치는 기병은 약함, 성 위 궁병은 강함
   dmg *= SG.match(a.t, d.t);
   if (a.oid && SG.apt(a.oid) === a.t) dmg *= SG.APT_BONUS;

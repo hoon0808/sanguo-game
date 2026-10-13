@@ -14,7 +14,7 @@ SG.UI.title = function () {
     cont = h('button', { class: 'continue', type: 'button', onclick: function () { SG.UI.loadFrom('auto'); } }, [
       last.lid && SG.OFFICERS[last.lid] ? h('img', { class: 'continue-face', alt: '', src: SG.UI.portraitSrc(last.lid, true) }) : h('span', { class: 'continue-face' }),
       h('span', { class: 'continue-t' }, [h('small', { text: '이어하기' }), h('b', { text: last.lord }),
-        h('span', { text: last.y + '년 ' + last.m + '월' + (sc0 ? ' · ' + sc0.name : '') + (last.cities ? ' · 도시 ' + last.cities : '') })]),
+        h('span', { text: last.y + '년 ' + last.m + '월' + (sc0 ? ' · ' + sc0.name : '') + (last.cities ? ' · 도시 ' + last.cities : '') + ' · ' + (SG.DIFFS[last.diff] || SG.DIFFS.easy).n })]),
       SG.UI.icon('next', 22)
     ]);
   }
@@ -26,6 +26,8 @@ SG.UI.title = function () {
     item('scroll', '도움말', SG.UI.help),
     item('people', '소리 설정', SG.UI.soundSettings)
   ]);
+  var diffBox = h('div', { class: 't-diff' }, [h('div', { class: 't-diff-h' }, [h('b', { text: '난이도' }), h('small', { text: '새로 시작할 때 적용 · 게임 중에도 메뉴에서 바꿀 수 있음' })]),
+    SG.UI.diffPicker(SG.UI.diffPref(), function (k) { SG.UI.setDiffPref(k); })]);
   var gallery = h('div', { class: 'heroes' }, SG.UI.HEROES.map(function (x, i) {
     var o = SG.O(x[0]);
     return h('figure', { class: 'hero', style: { animationDelay: (i * 0.12) + 's' } }, [
@@ -43,6 +45,7 @@ SG.UI.title = function () {
         h('h1', null, ['천하쟁패', h('span', { class: 'seal', text: '漢' })]),
         h('p', { class: 'lede', text: '한나라가 무너진 난세. 군주 한 명을 골라 장수를 모으고, 땅을 일구고, 이웃 성을 쳐서 천하를 하나로 만드세요.' }),
         menu,
+        diffBox,
         h('div', { class: 'title-snd' }, [SG.UI.soundBtn(), h('span', { text: '♪ 배경음악·효과음이 있습니다. 화면을 한 번 누르면 음악이 시작됩니다' })]),
         h('div', { class: 'title-foot', text: '인터넷 없이도 실행됩니다 · 진행 기록은 이 컴퓨터의 브라우저에 저장됩니다' })
       ]),
@@ -53,6 +56,42 @@ SG.UI.title = function () {
 };
 
 SG.UI.TITLE_ART = ['img/scene/title-a.jpg', 'img/scene/title-b.jpg'];
+
+// 난이도: 타이틀에서 고르고(이 브라우저에 기억), 새 게임을 시작할 때 쓴다
+SG.UI.diffPref = function () { try { var k = localStorage.getItem('sanguo_diff'); if (SG.DIFFS[k]) return k; } catch (e) { /* 기본값 */ } return 'normal'; };
+SG.UI.setDiffPref = function (k) { try { localStorage.setItem('sanguo_diff', k); } catch (e) { /* 무시 */ } };
+// 난이도 고르는 줄. cur: 지금 값, onPick(k)
+SG.UI.diffPicker = function (cur, onPick) {
+  var wrap = h('div', { class: 'diff-pick' }), desc = h('p', { class: 'diff-desc' });
+  function draw() {
+    wrap.innerHTML = '';
+    wrap.appendChild(h('div', { class: 'diff-row', role: 'radiogroup', 'aria-label': '난이도' }, SG.DIFF_KEYS.map(function (k) {
+      var D = SG.DIFFS[k];
+      return h('button', { type: 'button', class: 'diff-b d-' + k + (k === cur ? ' on' : ''), role: 'radio', 'aria-checked': k === cur ? 'true' : 'false', 'data-diff': k, onclick: function () {
+        cur = k; SG.UI.sfx('click'); draw(); if (onPick) onPick(k);
+      } }, [h('i', { text: D.h }), h('span', { text: D.n })]);
+    })));
+    desc.textContent = SG.DIFFS[cur].d;
+    wrap.appendChild(desc);
+  }
+  draw();
+  return wrap;
+};
+// 게임 중에 난이도 바꾸기 (시작 덤은 다시 주지 않음)
+SG.UI.changeDiff = async function () {
+  var cur = SG.diffKey(), pick = cur;
+  var body = h('div', null, [
+    h('p', { class: 'note', text: '지금부터 컴퓨터 세력의 수입·전투력·공격 성향이 바뀝니다. 처음에 주는 물자 덤은 다시 주지 않습니다.' }),
+    SG.UI.diffPicker(cur, function (k) { pick = k; })
+  ]);
+  var ok = await SG.UI.modal({ title: '난이도 — 지금 게임의 난이도', icon: 'flag', body: body, cancel: false, buttons: [{ label: '취소', value: false }, { label: '바꾸기', value: true, cls: 'primary' }] });
+  if (!ok || pick === cur) return;
+  SG.setDifficulty(pick, false);
+  SG.UI.setDiffPref(pick);
+  SG.log(SG.S.player, '난이도를 「' + SG.DIFFS[pick].n + '」(으)로 바꾸었다.', 'sys');
+  SG.UI.toast(SG.josa('난이도를 「' + SG.DIFFS[pick].n + '」(으)로 바꾸었습니다'));
+  SG.UI.refresh();
+};
 
 // 시나리오 미니 지도: 지형 그림 위에 세력 색 점
 SG.UI.miniMap = function (sc) {
@@ -124,12 +163,13 @@ SG.UI.lordSelect = function (scId) {
   function start() {
     if (!chosen) return;
     SG.newGame(scId, SG.S.forces[chosen].lord, Date.now() % 2147483647);
+    SG.setDifficulty(SG.UI.diffPref(), true);
     SG.UI.startGame();
   }
   function choose(fid) {
     chosen = fid; map.select(SG.S.forces[fid].capital); render();
   }
-  function stars(n) { var s = h('span', { class: 'stars', title: '난이도' }); for (var i = 1; i <= 5; i++) s.appendChild(h('i', { class: i <= n ? 'on' : '' })); return s; }
+  function stars(n) { var s = h('span', { class: 'stars', title: '세력 형편 (별이 많을수록 어려운 출발)' }); for (var i = 1; i <= 5; i++) s.appendChild(h('i', { class: i <= n ? 'on' : '' })); return s; }
   function render() {
     // 선택한 군주 자세히
     detail.innerHTML = '';
@@ -148,7 +188,7 @@ SG.UI.lordSelect = function (scId) {
             return h('span', null, [h('small', { text: x[0] }), h('b', { class: SG.UI.statClass(x[1]), text: x[1] })]);
           })),
           h('div', { class: 'ld-tot' }, [h('span', { text: '본거지 ' + SG.cityName(f.capital) }), h('span', { text: '도시 ' + t.cities }), h('span', { text: '장수 ' + t.officers }), h('span', { text: '병사 ' + SG.fmt(t.soldiers) })]),
-          h('div', { class: 'ld-diff' }, ['난이도 ', stars(df.stars), h('b', { text: df.label })])
+          h('div', { class: 'ld-diff' }, ['세력 형편 ', stars(df.stars), h('b', { text: df.label }), h('span', { class: 'ld-gdiff', title: '타이틀 화면에서 바꿀 수 있습니다', text: '게임 난이도 ' + SG.DIFFS[SG.UI.diffPref()].h + ' ' + SG.DIFFS[SG.UI.diffPref()].n })])
         ])
       ]));
       if (offs.length) detail.appendChild(h('div', { class: 'ld-offs' }, offs.slice(0, 9).map(function (o) {
@@ -322,6 +362,7 @@ SG.UI.help = function () {
   var body = h('div', { html:
     '<p><b>목표</b>: 중국의 모든 도시를 차지해 천하를 통일하세요.</p>' +
     '<p><b>한 달의 흐름</b>: 내 도시를 눌러 장수에게 명령 → <b>턴 종료</b> → 다른 군주들이 움직임 → 다음 달.<br>장수 한 명은 한 달에 명령 하나를 할 수 있습니다. <b>같은 명령은 도시마다 한 달에 한 번</b>만 할 수 있습니다 (이동·포상은 제외, 한 번 한 명령 단추에는 「完」이 찍힙니다).</p>' +
+    '<p><b>난이도</b>: 타이틀 화면에서 고릅니다 (쉬움·보통·어려움·지옥). 어려울수록 컴퓨터 세력의 수입·시작 물자·병력·전투력이 늘고, 더 과감하게 우리를 노리며, 적 장수 등용이 어려워지고 우리 장수 충성이 조금씩 떨어집니다. 게임 중에도 메뉴 「난이도」에서 바꿀 수 있습니다 (시작 물자 덤은 다시 주지 않음).</p>' +
     '<p><b>협력</b>: 명령 창의 「협력 장수」에서 최대 3명을 고르면, 맡은 장수에게 능력의 일부(높은 순서로 50%·35%·25%)를 보태 효과가 커집니다. 협력한 장수도 이번 달 명령을 씁니다. 개발·민심 안정·계략은 협력 1명마다 비용이 50% 늘어납니다. 컴퓨터 세력도 같은 규칙을 따릅니다.</p>' +
     '<p><b>포상</b>: 내릴 금을 정할 수 있고(많이 줄수록 충성이 더 오름), 우리 장수가 가진 보물을 함께 내릴 수도 있습니다.</p>' +
     '<p><b>돈과 식량</b>: 금은 매달 상업에서, 식량은 7월 가을걷이에 농업에서 들어옵니다. 병사는 매달 100명당 식량 1을 먹습니다. 식량이 떨어지면 병사가 달아납니다.</p>' +

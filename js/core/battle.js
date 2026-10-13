@@ -252,8 +252,8 @@ SG.autoBattle = function (atk, def) {
     if (aT <= 0 || dT <= 0) break;
     // 병종 상성: 상대 병종 구성에 따라 힘이 오르내린다. 성벽이 있으면 공격 기병은 약하고 수비 궁병은 강하다
     var aS = SG.mixShare(atk.units), dS = SG.mixShare(def.units), walled = t.wall > wallMax * 0.15;
-    var aP = atk.units.reduce(function (s, u) { return s + (u.n > 0 ? SG.unitPower(u.oid, u.n, atk.train, am, u.t) * SG.matchVs(u.t, dS) * (walled && u.t === 'cav' ? 0.85 : 1) : 0); }, 0);
-    var dP = def.units.reduce(function (s, u) { return s + (u.n > 0 ? SG.unitPower(u.oid, u.n, def.train, dm, u.t) * SG.matchVs(u.t, aS) * (walled && u.t === 'arc' ? 1.15 : 1) : 0); }, 0) * wallBonus;
+    var aP = atk.units.reduce(function (s, u) { return s + (u.n > 0 ? SG.unitPower(u.oid, u.n, atk.train, am, u.t) * SG.matchVs(u.t, dS) * (walled && u.t === 'cav' ? 0.85 : 1) : 0); }, 0) * (SG.aiMul ? SG.aiMul(atk.fid, 'power') : 1);
+    var dP = def.units.reduce(function (s, u) { return s + (u.n > 0 ? SG.unitPower(u.oid, u.n, def.train, dm, u.t) * SG.matchVs(u.t, aS) * (walled && u.t === 'arc' ? 1.15 : 1) : 0); }, 0) * wallBonus * (SG.aiMul ? SG.aiMul(def.fid, 'power') : 1);
     var toDef = aP * 0.09 * SG.randf(0.8, 1.2), toAtk = dP * 0.09 * SG.randf(0.8, 1.2);
     var lostD = SG.spreadDamage(def.units, toDef, dT), lostA = SG.spreadDamage(atk.units, toAtk, aT);
     var rA = lostA / Math.max(1, aT), rD = lostD / Math.max(1, dT);

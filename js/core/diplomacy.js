@@ -14,8 +14,9 @@ SG.cmd.rumor = function (cid, oid, target) {
   if (!SG.ready(cid, oid)) return { ok: false, msg: '명령할 수 없는 장수입니다' };
   var c = SG.S.cities[cid], t = SG.S.cities[target];
   if (SG.ADJ[cid].indexOf(target) < 0 || !t.owner || t.owner === c.owner) return { ok: false, msg: '붙어 있는 다른 세력 도시만 고를 수 있습니다' };
-  if (c.gold < SG.COST.rumor) return { ok: false, msg: '금이 부족합니다 (필요 ' + SG.COST.rumor + ')' };
-  c.gold -= SG.COST.rumor;
+  var cost = SG.coopCost ? SG.coopCost(SG.COST.rumor) : SG.COST.rumor;
+  if (c.gold < cost) return { ok: false, msg: '금이 부족합니다 (필요 ' + cost + ')' };
+  c.gold -= cost;
   SG.S.off[oid].acted = true;
   var r = SG.rel(c.owner, t.owner); r.fr = Math.max(0, r.fr - 5);
   if (SG.chance(SG.rumorChance(oid, target))) {
@@ -39,8 +40,9 @@ SG.cmd.sow = function (cid, oid, target) {
   if (!t || t.s !== 'force' || t.f === c.owner) return { ok: false, msg: '다른 세력 장수만 고를 수 있습니다' };
   var p = SG.sowChance(oid, target);
   if (p <= 0) return { ok: false, msg: '군주와 그 가족은 이간할 수 없습니다' };
-  if (c.gold < SG.COST.sow) return { ok: false, msg: '금이 부족합니다 (필요 ' + SG.COST.sow + ')' };
-  c.gold -= SG.COST.sow;
+  var cost = SG.coopCost ? SG.coopCost(SG.COST.sow) : SG.COST.sow;
+  if (c.gold < cost) return { ok: false, msg: '금이 부족합니다 (필요 ' + cost + ')' };
+  c.gold -= cost;
   SG.S.off[oid].acted = true;
   if (SG.chance(p)) {
     var d = SG.randInt(10, 20);

@@ -35,8 +35,9 @@ SG.cmd.develop = function (cid, oid, kind) {
   var c = SG.S.cities[cid], z = SG.CITY_SIZE[SG.CITIES[cid].size];
   var max = z[kind + 'Max'];
   if (c[kind] >= max) return fail(SG.DEV_KIND[kind] + '이(가) 이미 최고치입니다');
-  if (c.gold < SG.COST.develop) return fail('금이 부족합니다 (필요 ' + SG.COST.develop + ')');
-  c.gold -= SG.COST.develop;
+  var cost = SG.coopCost ? SG.coopCost(SG.COST.develop) : SG.COST.develop;
+  if (c.gold < cost) return fail('금이 부족합니다 (필요 ' + cost + ')');
+  c.gold -= cost;
   var g = Math.max(1, Math.round(SG.devGain(oid, kind) * SG.randf(0.85, 1.15)));
   g = Math.min(g, max - c[kind]);
   c[kind] += g;
@@ -46,8 +47,9 @@ SG.cmd.relief = function (cid, oid) {
   if (!SG.ready(cid, oid)) return fail('명령할 수 없는 장수입니다');
   var c = SG.S.cities[cid];
   if (c.loyal >= 100) return fail('민심이 이미 최고치입니다');
-  if (c.food < SG.COST.relief) return fail('식량이 부족합니다 (필요 ' + SG.COST.relief + ')');
-  c.food -= SG.COST.relief;
+  var cost = SG.coopCost ? SG.coopCost(SG.COST.relief) : SG.COST.relief;
+  if (c.food < cost) return fail('식량이 부족합니다 (필요 ' + cost + ')');
+  c.food -= cost;
   var o = SG.O(oid);
   var g = Math.round((o.cha * 0.15 + 6) * (o.sk === '인덕' ? 1.3 : 1) * SG.randf(0.85, 1.15));
   g = Math.min(g, 100 - c.loyal);
@@ -184,15 +186,20 @@ SG.cmd.recruit = function (cid, oid, target) {
   if (t.s === 'force') t.loy = Math.min(100, t.loy + 2);
   return done(oid, SG.name(target) + '은(는) ' + SG.name(oid) + '의 권유를 거절했다.', { success: false });
 };
-SG.cmd.reward = function (cid, target) {
+// 포상: 금을 얼마나 내릴지 고른다 (많이 줄수록 충성이 더 오르지만 갈수록 덜 오른다)
+SG.rewardGain = function (gold) { return Math.max(1, Math.round(9 * Math.pow(gold / 100, 0.7))); };
+SG.cmd.reward = function (cid, target, gold) {
   var c = SG.S.cities[cid], t = SG.S.off[target];
+  gold = Math.max(0, Math.round(gold == null ? SG.COST.reward : gold));
   if (!t || t.s !== 'force' || t.f !== c.owner || t.c !== cid) return fail('이 도시의 우리 장수만 포상할 수 있습니다');
-  if (t.loy >= 100) return fail('충성도가 이미 최고치입니다');
-  if (c.gold < SG.COST.reward) return fail('금이 부족합니다 (필요 ' + SG.COST.reward + ')');
-  c.gold -= SG.COST.reward;
-  var g = SG.randInt(6, 12);
-  t.loy = Math.min(100, t.loy + g);
-  var msg = SG.name(target) + '에게 금 ' + SG.COST.reward + '을(를) 내렸다. 충성 +' + g;
+  if (t.loy >= 100) return fail('충성이 이미 최고치입니다');
+  if (gold < 10) return fail('내릴 금을 정하세요');
+  if (c.gold < gold) return fail('금이 부족합니다 (필요 ' + gold + ')');
+  c.gold -= gold;
+  var g = Math.max(1, Math.round(SG.rewardGain(gold) * SG.randf(0.75, 1.25)));
+  g = Math.min(g, 100 - t.loy);
+  t.loy += g;
+  var msg = SG.name(target) + '에게 금 ' + SG.fmt(gold) + '을(를) 내렸다. 충성 +' + g;
   if (SG.cmdLog) SG.cmdLog.push({ oid: target, msg: SG.josa(msg), ok: true });
   return { ok: true, msg: msg, gain: g };
 };

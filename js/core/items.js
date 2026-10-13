@@ -115,7 +115,7 @@ SG.seizeItems = function (oid, captor) {
 
 // 우리 장수끼리 보물을 건넨다 (명령 횟수는 쓰지 않는다)
 SG.cmd = SG.cmd || {};
-SG.cmd.bestow = function (id, to) {
+SG.cmd.bestow = function (id, to, quiet) {
   var S = SG.S, cur = S.items[id] && S.items[id].o, t = S.off[to];
   if (!cur || !t || t.s !== 'force') return { ok: false, msg: '줄 수 없습니다' };
   var from = S.off[cur];
@@ -126,6 +126,6 @@ SG.cmd.bestow = function (id, to) {
   if (to !== lord) { g = Math.min(100 - t.loy, 10 + (SG.ITEMS[id].k === 'treasure' ? 5 : 0)); t.loy += g; }
   if (cur !== lord) { l = Math.min(from.loy, 5); from.loy -= l; }
   var msg = SG.name(to) + '에게 ' + SG.itemName(id) + '을(를) 내렸다.' + (g ? ' 충성 +' + g : '') + (l ? ' (' + SG.name(cur) + ' 충성 −' + l + ')' : '');
-  SG.log(t.f, msg, 'staff');
+  if (!quiet) SG.log(t.f, msg, 'staff');
   return { ok: true, msg: SG.josa(msg), gain: g };
 };

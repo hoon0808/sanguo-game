@@ -12,81 +12,60 @@ SG.AI.city = function (cid) {
   SG.officersIn(cid, fid).forEach(function (o) {
     if (SG.S.off[o].loy < 70 && c.gold > 400 && SG.S.forces[fid].lord !== o) SG.cmd.reward(cid, o);
   });
-  function take(stat, filter) {
-    var list = pool.filter(filter || function () { return true; });
-    if (!list.length) return null;
-    list.sort(function (a, b) { return SG.O(b)[stat] - SG.O(a)[stat]; });
-    pool.splice(pool.indexOf(list[0]), 1);
-    return list[0];
+  // 명령마다 한 달에 한 번: 할 일을 고른 뒤, 남는 장수는 협력 장수로 붙인다
+  var free = SG.freeIn(cid, true), tasks = [];
+  function add(key, stat, run, weight) { if (!SG.cmdUsed(cid, key)) tasks.push({ key: key, stat: stat, run: run, w: weight || 1 }); }
+  if (free.length) add('recruit', 'cha', function (o) { return SG.cmd.recruit(cid, o, free[0]); }, 2);
+  if (pool.length >= 2 && SG.chance(0.35)) add('search', 'int', function (o) {
+    var sr = SG.cmd.search(cid, o);
+    if (sr && sr.item) SG.log(c.owner, SG.forceName(c.owner) + '의 ' + SG.name(o) + '이(가) ' + SG.cityName(cid) + '에서 ' + SG.itemName(sr.item) + '을(를) 손에 넣었다.', 'person');
+    return sr;
+  }, 0.5);
+  if (c.loyal < 45 && c.food >= 800) add('relief', 'cha', function (o) { return SG.cmd.relief(cid, o); }, 1.5);
+  var want = th.front ? Math.max(th.max, 7000 + size * 4000) : 3000 + size * 1000;
+  var foodCap = (c.food + c.agri * 5) * 100 / 10;
+  want = Math.min(want, foodCap, 60000);
+  if (c.soldiers < want && c.gold >= 200 && c.loyal >= 35) add('conscript', 'cha', function (o) { return SG.cmd.conscript(cid, o, null, SG.aiTroopType(cid)); }, 1.5);
+  if (c.soldiers > 2000 && c.train < (th.front ? 80 : 60)) add('train', 'lead', function (o) { return SG.cmd.train(cid, o); }, 1.2);
+  // 교역: 식량이 모자라면 금으로 사고, 식량이 남아도는데 금이 없으면 판다
+  var needF = Math.ceil(c.soldiers / 100);
+  if (c.food < needF * 4 + 500 && c.gold > 500 || c.food > needF * 30 + 20000 && c.gold < 300) add('trade', 'pol', function (o) {
+    var R = SG.tradeRates(cid, o), buy = c.food < needF * 4 + 500;
+    var amt = buy ? Math.min(R.max, Math.floor((c.gold - 300) / R.buy) * 100) : Math.min(R.max, c.food - needF * 30);
+    return amt >= 500 ? SG.cmd.trade(cid, o, buy ? 'buy' : 'sell', amt) : null;
+  }, 0.3);
+  // 개발: 모자란 것부터 (금이 될 때만)
+  var kinds = ['agri', 'comm'];
+  if (th.front) kinds.push('wall');
+  kinds = kinds.filter(function (k2) { return c[k2] < z[k2 + 'Max']; });
+  kinds.sort(function (a, b) { return c[a] / z[a + 'Max'] - c[b] / z[b + 'Max']; });
+  var budget = c.gold - 100;
+  kinds.forEach(function (k2) { if (budget >= SG.COST.develop) { budget -= SG.COST.develop * 2; add(k2, k2 === 'wall' ? 'lead' : 'pol', function (o) { return SG.cmd.develop(cid, o, k2); }, 1); } });
+  // 남는 장수가 있는데 할 일이 없으면 훈련
+  if (!tasks.some(function (t) { return t.key === 'train'; }) && c.soldiers > 0 && c.train < 100) add('train', 'lead', function (o) { return SG.cmd.train(cid, o); }, 0.8);
+
+  tasks = tasks.slice(0, pool.length);
+  // 주장: 할 일마다 그 능력이 가장 높은 장수
+  function best(stat) {
+    if (!pool.length) return null;
+    pool.sort(function (a, b) { return SG.O(b)[stat] - SG.O(a)[stat]; });
+    return pool.shift();
   }
+  tasks.forEach(function (t) { t.main = best(t.stat); t.help = []; });
+  // 남은 장수는 중요한 일부터 협력 (한 일에 최대 3명)
+  var order = tasks.filter(function (t) { return t.key !== 'trade' && t.key !== 'search'; }).sort(function (a, b) { return b.w - a.w; });
   var guard = 0;
-  while (pool.length && guard++ < 20) {
-    var did = false;
-    // 1) 찾은 인재 등용
-    var free = SG.freeIn(cid, true);
-    if (free.length) {
-      var r = take('cha');
-      if (r) { SG.cmd.recruit(cid, r, free[0]); continue; }
-    }
-    // 2) 탐색 (가끔)
-    if (pool.length >= 2 && !c._searched && SG.chance(0.35)) {
-      c._searched = true;
-      var s = take('int');
-      if (s) {
-        var sr = SG.cmd.search(cid, s);
-        if (sr && sr.item) SG.log(c.owner, SG.forceName(c.owner) + '의 ' + SG.name(s) + '이(가) ' + SG.cityName(cid) + '에서 ' + SG.itemName(sr.item) + '을(를) 손에 넣었다.', 'person');
-        continue;
-      }
-    }
-    // 3) 민심
-    if (c.loyal < 45 && c.food >= 800) {
-      var m = take('cha');
-      if (m) { SG.cmd.relief(cid, m); continue; }
-    }
-    // 4) 징병
-    var want = th.front ? Math.max(th.max, 7000 + size * 4000) : 3000 + size * 1000;
-    var foodCap = (c.food + c.agri * 5) * 100 / 10;
-    want = Math.min(want, foodCap, 60000);
-    if (c.soldiers < want && c.gold >= 200 && c.loyal >= 35) {
-      var k = take('cha');
-      if (k) { SG.cmd.conscript(cid, k, null, SG.aiTroopType(cid)); continue; }
-    }
-    // 5) 훈련
-    if (c.soldiers > 2000 && c.train < (th.front ? 80 : 60)) {
-      var t = take('lead');
-      if (t) { SG.cmd.train(cid, t); continue; }
-    }
-    // 5-1) 교역: 식량이 모자라면 금으로 사고, 식량이 남아도는데 금이 없으면 판다
-    var needF = Math.ceil(c.soldiers / 100);
-    if (!c._traded && (c.food < needF * 4 + 500 && c.gold > 500 || c.food > needF * 30 + 20000 && c.gold < 300)) {
-      var tr = take('pol');
-      if (tr) {
-        c._traded = true;
-        var R = SG.tradeRates(cid, tr), buy = c.food < needF * 4 + 500;
-        var amt = buy ? Math.min(R.max, Math.floor((c.gold - 300) / R.buy) * 100) : Math.min(R.max, c.food - needF * 30);
-        if (amt >= 500) { SG.cmd.trade(cid, tr, buy ? 'buy' : 'sell', amt); continue; }
-        pool.push(tr);
-      }
-    }
-    // 6) 개발
-    if (c.gold >= 150) {
-      var kinds = ['agri', 'comm'];
-      if (th.front) kinds.push('wall');
-      kinds = kinds.filter(function (k2) { return c[k2] < z[k2 + 'Max']; });
-      if (kinds.length) {
-        kinds.sort(function (a, b) { return c[a] / z[a + 'Max'] - c[b] / z[b + 'Max']; });
-        var d = take(kinds[0] === 'wall' ? 'lead' : 'pol');
-        if (d) { SG.cmd.develop(cid, d, kinds[0]); did = true; continue; }
-      }
-    }
-    // 7) 남는 장수는 훈련
-    if (c.soldiers > 0 && c.train < 100) {
-      var t2 = take('lead');
-      if (t2) { SG.cmd.train(cid, t2); continue; }
-    }
-    if (!did) break;
+  while (pool.length && order.length && guard++ < 40) {
+    var t = order[guard % order.length];
+    if (t.help.length >= SG.COOP_MAX) { if (order.every(function (x) { return x.help.length >= SG.COOP_MAX; })) break; continue; }
+    t.help.push(best(t.stat));
   }
-  delete c._searched; delete c._traded;
+  tasks.forEach(function (t) {
+    if (!t.main) return;
+    SG.setHelpers(t.main, t.help);
+    t.run(t.main);
+    SG.helpers = null;
+  });
 };
 
 // 앞쪽(적과 맞닿은) 도시까지 거리

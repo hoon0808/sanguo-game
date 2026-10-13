@@ -1475,3 +1475,36 @@ html.portrait .ld-art + .lord-detail { margin-top: -44px; }
 .bf.troop.on { border-color: #9a7420; background: rgba(181, 138, 44, .16); box-shadow: 0 0 0 1px #9a7420; }
 .breach-line { fill: none; stroke: rgba(120, 86, 40, .55); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 4 9; animation: fade 1.1s ease-out reverse both; }
 .gov-btn { margin-left: 10px; padding: 3px 9px; font-size: 12px; vertical-align: 3px; font-family: inherit; }
+
+/* ---- 협력 장수 · 한 달 한 번 */
+.coop-row { margin: 10px 0 6px; padding: 9px 10px; border: 1px dashed rgba(176, 138, 62, .6); border-radius: 6px; background: rgba(216, 183, 101, .08); }
+.coop-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 7px; }
+.coop-h b { font-family: var(--f-display); font-size: 15px; }
+.coop-n { font-weight: 700; color: var(--brz); font-variant-numeric: tabular-nums; }
+.coop-h small { color: var(--muted); font-size: 12px; }
+.coop-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.coop-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; cursor: pointer; }
+.coop-chip .pt { border-radius: 50%; }
+.coop-chip b { font-size: 11px; color: var(--muted); font-weight: 600; }
+.coop-chip.on { border-color: var(--brz); background: linear-gradient(180deg, #fff6dc, #f0dda9); box-shadow: 0 0 0 1px var(--brz); color: #2e2415; }
+.coop-chip.on b { color: #6b5214; }
+.coop-chip i { position: absolute; right: -5px; top: -6px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--good); color: #fff; font-style: normal; font-size: 11px; font-family: var(--f-display); }
+.coop-chip:disabled { opacity: .45; cursor: default; }
+.cmd.used { opacity: .55; filter: grayscale(.6); cursor: default; position: relative; }
+.cmd .cmd-done { position: absolute; right: 6px; top: 6px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 3px; border: 1.5px solid #b2382c; color: #b2382c; font-family: var(--f-display); font-size: 13px; transform: rotate(-8deg); }
+.rc-help { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; }
+.rc-help > span:first-child { font-family: var(--f-display); color: #8a7a5a; }
+.rc-hp { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; border-radius: 18px; background: rgba(176, 138, 62, .14); }
+.rc-hp .pt { border-radius: 50%; }
+html.compact .coop-chip { font-size: 12px; padding-right: 8px; }
+html.compact .coop-chip .pt { width: 24px !important; height: 24px !important; }
+/* 포상: 금 슬라이더 + 보물 */
+.rw-items { margin: 6px 0 4px; }
+.rw-h { font-family: var(--f-display); font-size: 14px; margin-bottom: 6px; }
+.rw-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.rw-item { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; cursor: pointer; text-align: left; }
+.rw-item span { display: flex; flex-direction: column; }
+.rw-item b { font-family: var(--f-display); font-weight: 400; font-size: 15px; }
+.rw-item small { font-size: 11px; color: var(--muted); }
+.rw-item.on { border-color: var(--brz); box-shadow: 0 0 0 1px var(--brz); background: linear-gradient(180deg, #fff6dc, #f0dda9); color: #2e2415; }
+.rw-item i { position: absolute; right: -5px; top: -6px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--good); color: #fff; font-style: normal; font-size: 11px; }

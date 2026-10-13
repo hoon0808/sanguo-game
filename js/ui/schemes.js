@@ -30,13 +30,16 @@ SG.UI.cmdRumor = async function (cid) {
     tbl.innerHTML = '';
     tbl.appendChild(SG.UI.officerCards(ready, { big: true,
       stat: function (o) { return { label: '지력', value: SG.O(o).int, hi: SG.O(o).int >= 80 }; },
-      extra: function (o) { return '성공률 ' + Math.round(SG.rumorChance(o, target) * 100) + '%'; },
+      extra: function (o) { return '성공률 ' + Math.round(SG.UI.coopCalc(o, function () { return SG.rumorChance(o, target); }) * 100) + '%'; },
+      mark: function (o) { return SG.UI.pendingHelpers && SG.UI.pendingHelpers.indexOf(o) >= 0 ? { tag: ['助', '협력'], up: true } : null; },
       onPick: function (o) { closeFn(o); } }));
   };
+  var coopR = SG.UI.coopRow(cid, 'int', null, function () { tbl.refresh(); }, '비용 +50%/명');
   tbl.refresh();
   var body = h('div', null, [
     SG.UI.brief('헛소문을 퍼뜨려 상대 도시의 민심과 병사 사기를 떨어뜨립니다 · 금 ' + SG.COST.rumor + ' · 지력이 높을수록 잘 됩니다'),
     h('div', { class: 'step' }, [h('i', { text: '一' }), '목표 도시']), sel,
+    coopR,
     h('div', { class: 'step' }, [h('i', { text: '二' }), '실행할 장수 (누르면 바로 실행)']),
     h('div', { class: 'pick-cards' }, [tbl])
   ]);
@@ -50,17 +53,20 @@ SG.UI.cmdSow = async function (cid) {
   if (!ready.length) { SG.UI.toast('이번 달에 명령할 수 있는 장수가 없습니다', true); return; }
   var plotter = ready.slice().sort(function (a, b) { return SG.O(b).int - SG.O(a).int; })[0];
   var closeFn, body = h('div');
+  function sowP(o) { return SG.UI.coopCalc(plotter, function () { return SG.sowChance(plotter, o); }); }
+  var coopS = SG.UI.coopRow(cid, 'int', function () { return plotter; }, function () { render(); }, '비용 +50%/명');
   function render() {
     body.innerHTML = '';
     var sel = h('select', { class: 'inp', style: { width: '200px' }, onchange: function (e) { plotter = e.target.value; render(); } },
       ready.slice().sort(function (a, b) { return SG.O(b).int - SG.O(a).int; }).map(function (o) { return h('option', { value: o, selected: o === plotter || null, text: SG.name(o) + ' (지력 ' + SG.O(o).int + ')' }); }));
     body.appendChild(h('div', { class: 'field' }, [h('label', { text: '실행할 장수' }), sel]));
+    coopS.redraw(); body.appendChild(coopS);
     body.appendChild(SG.UI.brief('다른 세력 장수의 충성을 떨어뜨립니다 · 금 ' + SG.COST.sow + ' · 충성이 낮아지면 「등용」하기 쉬워지고 스스로 떠나기도 합니다'));
     var list = Object.keys(S.off).filter(function (o) { var x = S.off[o]; return x.s === 'force' && x.f !== c.owner && SG.sowChance(plotter, o) > 0; });
     body.appendChild(h('div', { class: 'pick-list' }, [SG.UI.officerTable(list, {
-      sortBy: { get: function (o) { return SG.sowChance(plotter, o); } },
+      sortBy: { get: function (o) { return sowP(o); } },
       cols: [{ label: '세력', get: function (o) { return SG.forceName(S.off[o].f); } }, { label: '충성', cls: 'n', get: function (o) { return S.off[o].loy; } },
-        { label: '성공률', cls: 'n', get: function (o) { return SG.sowChance(plotter, o); }, render: function (o) { return Math.round(SG.sowChance(plotter, o) * 100) + '%'; } }],
+        { label: '성공률', cls: 'n', get: function (o) { return sowP(o); }, render: function (o) { return Math.round(sowP(o) * 100) + '%'; } }],
       onPick: function (o) { closeFn(o); } })]));
   }
   render();
@@ -82,16 +88,20 @@ SG.UI.cmdDiplo = async function (cid, kind) {
   if (!ready.length) { SG.UI.toast('이번 달에 명령할 수 있는 장수가 없습니다', true); return; }
   var envoy = ready.slice().sort(function (a, b) { return SG.O(b).cha - SG.O(a).cha; })[0];
   function chance(f) {
-    if (kind === 'ally') return SG.allyChance(envoy, c.owner, f);
-    if (kind === 'demand') return SG.surrenderChance(envoy, c.owner, f);
-    return 1;
+    return SG.UI.coopCalc(envoy, function () {
+      if (kind === 'ally') return SG.allyChance(envoy, c.owner, f);
+      if (kind === 'demand') return SG.surrenderChance(envoy, c.owner, f);
+      return 1;
+    });
   }
   var closeFn, body = h('div');
+  var coopD = SG.UI.coopRow(cid, 'cha', function () { return envoy; }, function () { render(); });
   function render() {
     body.innerHTML = '';
     var sel = h('select', { class: 'inp', style: { width: '200px' }, onchange: function (e) { envoy = e.target.value; render(); } },
       ready.slice().sort(function (a, b) { return SG.O(b).cha - SG.O(a).cha; }).map(function (o) { return h('option', { value: o, selected: o === envoy || null, text: SG.name(o) + ' (매력 ' + SG.O(o).cha + ')' }); }));
     body.appendChild(h('div', { class: 'field' }, [h('label', { text: '사신' }), sel]));
+    coopD.redraw(); body.appendChild(coopD);
     body.appendChild(SG.UI.brief(D.note.replace(/\. /g, " · ").replace(/\.$/, "") + ' · 상대 세력을 누르세요'));
     var tb = h('tbody');
     others.slice().sort(function (a, b) { return chance(b) - chance(a) || SG.rel(c.owner, b).fr - SG.rel(c.owner, a).fr; }).forEach(function (f) {
@@ -101,7 +111,7 @@ SG.UI.cmdDiplo = async function (cid, kind) {
         h('td', null, [h('span', { style: { display: 'inline-flex', gap: '8px', alignItems: 'center' } }, [SG.UI.seal(f, 22), SG.forceName(f)]),
           r.ally > 0 ? h('span', { class: 'tag ally', text: '동맹 ' + r.ally + '개월' }) : null]),
         h('td', { class: 'n', text: t.cities }), h('td', { class: 'n', text: SG.fmt(t.soldiers) }), h('td', { class: 'n' }, [h('span', { class: 'fr' }, [h('i', { style: { width: SG.clamp(r.fr, 0, 100) + '%', background: r.fr >= 70 ? 'var(--good)' : r.fr >= 40 ? 'var(--bronze)' : 'var(--bad)' } })]), String(r.fr)]),
-        h('td', { class: 'n', text: kind === 'gift' ? '+' + Math.round(11 + SG.O(envoy).cha / 10) : Math.round(p * 100) + '%' })
+        h('td', { class: 'n', text: kind === 'gift' ? '+' + Math.round(11 + SG.UI.coopCalc(envoy, function () { return SG.O(envoy).cha; }) / 10) : Math.round(p * 100) + '%' })
       ]));
     });
     body.appendChild(h('div', { class: 'pick-list' }, [h('table', { class: 't' }, [h('thead', null, [h('tr', null, [

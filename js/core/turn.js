@@ -116,6 +116,7 @@ SG.nextMonth = async function () {
   S.turnCount++;
   if (S.month > 12) { S.month = 1; S.year++; }
   Object.keys(S.off).forEach(function (o) { S.off[o].acted = false; });
+  if (SG.resetCmds) SG.resetCmds();
 
   // 수입·수확·식량
   Object.keys(S.cities).forEach(function (cid) {

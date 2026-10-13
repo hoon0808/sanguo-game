@@ -27,7 +27,7 @@ SG.UI.CMD_GROUPS = [
 SG.UI.CMD_META = {
   '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'], '교역': ['trade', '금 ↔ 식량'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
-  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'],
+  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금·보물'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
   '친선': ['gift', '금 300 · 매력'], '동맹': ['ally', '매력'], '항복 권고': ['surrender', '매력']
 };
@@ -45,10 +45,12 @@ SG.UI.commandBox = function (cid) {
     var g = SG.UI.CMD_GROUPS.filter(function (x) { return x.name === name; })[0];
     g.items.forEach(function (it) {
       var meta = SG.UI.CMD_META[it.label] || ['order', ''];
-      grid.appendChild(h('button', { class: 'cmd' + (it.cls ? ' ' + it.cls : ''), type: 'button', 'data-cmd': it.label, onclick: async function () {
+      var key = SG.UI.CMD_KEY_OF && SG.UI.CMD_KEY_OF[it.label], used = key && SG.cmdUsed(cid, key);
+      grid.appendChild(h('button', { class: 'cmd' + (it.cls ? ' ' + it.cls : '') + (used ? ' used' : ''), type: 'button', 'data-cmd': it.label, disabled: used || null, title: used ? '이번 달에 이미 했습니다 (명령마다 한 달에 한 번)' : null, onclick: async function () {
+        SG.UI.pendingHelpers = null;
         await it.run(cid);
         SG.UI.refresh();
-      } }, [SG.UI.icon(meta[0], 22), h('span', { class: 'cmd-l', text: it.label }), h('span', { class: 'cmd-h', text: meta[1] })]));
+      } }, [SG.UI.icon(meta[0], 22), h('span', { class: 'cmd-l', text: it.label }), h('span', { class: 'cmd-h', text: used ? '이번 달 완료' : meta[1] }), used ? h('span', { class: 'cmd-done', text: '完' }) : null]));
     });
   }
   SG.UI.CMD_GROUPS.forEach(function (g) {
@@ -105,22 +107,27 @@ SG.UI.pickOfficer = function (cid, title, sortBy, cols, note, gauge, top) {
     holder.appendChild(SG.UI.officerCards(ready, {
       big: true,
       stat: function (o) { var v = SG.O(o)[sortBy]; return { label: SG.UI.STAT_LABEL[sortBy], value: v, hi: v >= 80 }; },
-      extra: col ? function (o) { return col.label + ' ' + (col.render ? col.render(o) : col.get(o)); } : null,
-      onHover: gz ? function (o) { gz.show(gauge.gain(o)); } : null,
+      extra: col ? function (o) { return col.label + ' ' + SG.UI.coopCalc(o, function () { return col.render ? col.render(o) : col.get(o); }); } : null,
+      onHover: gz ? function (o) { gz.show(SG.UI.coopCalc(o, function () { return gauge.gain(o); })); } : null,
+      mark: function (o) { return SG.UI.pendingHelpers && SG.UI.pendingHelpers.indexOf(o) >= 0 ? { tag: ['助', '협력'], up: true } : null; },
       onPick: function (o) { closeFn(o); }
     }));
-    if (gz) gz.show(gauge.gain(ready[0]));
+    var first = ready.filter(function (o) { return !SG.UI.pendingHelpers || SG.UI.pendingHelpers.indexOf(o) < 0; })[0] || ready[0];
+    if (gz) gz.show(SG.UI.coopCalc(first, function () { return gauge.gain(first); }));
   }
+  var coop = SG.UI.coopRow(cid, sortBy, null, function () { build(); });
   build();
   // top: 카드 위에 붙는 선택 줄 (예: 징병 병종). top.onChange 가 불리면 카드를 다시 그린다
   if (top) top.rebuild = build;
   var body = h('div', null, [
     note || gz ? SG.UI.brief(note, gz) : null,
     top || null,
+    coop,
+    h('div', { class: 'step' }, [h('i', { text: '主' }), '맡을 장수 (누르면 바로 실행)']),
     holder
   ]);
   SG.UI.modal({ title: title, body: body, size: 'wide', cancel: null, buttons: [{ label: '취소', value: null }], onOpen: function (box, close) { closeFn = close; } })
-    .then(resolveFn);
+    .then(function (v) { if (!v) SG.UI.pendingHelpers = null; resolveFn(v); });
   return p;
 };
 
@@ -150,14 +157,14 @@ SG.UI.cmdDevelop = async function (cid, kind) {
   var stat = kind === 'wall' ? 'lead' : 'pol';
   var oid = await SG.UI.pickOfficer(cid, { agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수' }[kind] + ' — 누구에게 맡길까요?', stat,
     [{ label: '예상', cls: 'n', get: function (o) { return '+' + Math.round(SG.devGain(o, kind)); } }],
-    '금 ' + SG.COST.develop + ' 사용 · 보유 금 ' + SG.fmt(c.gold) + (kind === 'wall' ? ' · 통솔·정치가 높을수록 효과가 큽니다' : ' · 정치가 높을수록 효과가 큽니다'),
+    '금 ' + SG.COST.develop + ' 사용 (협력 1명마다 +50%) · 보유 금 ' + SG.fmt(c.gold) + (kind === 'wall' ? ' · 통솔·정치가 높을수록 효과가 큽니다' : ' · 정치가 높을수록 효과가 큽니다'),
     { label: SG.DEV_KIND[kind], cur: c[kind], max: max, gain: function (o) { return SG.devGain(o, kind); } });
   if (oid) await SG.UI.doCmd({ kind: kind, cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.develop(cid, oid, kind); } });
 };
 SG.UI.cmdRelief = async function (cid) {
   var oid = await SG.UI.pickOfficer(cid, '민심 안정 — 누구에게 맡길까요?', 'cha',
     [{ label: '예상', cls: 'n', get: function (o) { return '+' + Math.round((SG.O(o).cha * 0.15 + 6) * (SG.O(o).sk === '인덕' ? 1.3 : 1)); } }],
-    '식량 ' + SG.COST.relief + '을(를) 백성에게 나눕니다 · 보유 식량 ' + SG.fmt(SG.S.cities[cid].food) + ' · 매력이 높을수록 효과가 큽니다',
+    '식량 ' + SG.COST.relief + '을(를) 백성에게 나눕니다 (협력 1명마다 +50%) · 보유 식량 ' + SG.fmt(SG.S.cities[cid].food) + ' · 매력이 높을수록 효과가 큽니다',
     { label: '민심', cur: SG.S.cities[cid].loyal, max: 100, gain: function (o) { return (SG.O(o).cha * 0.15 + 6) * (SG.O(o).sk === '인덕' ? 1.3 : 1); } });
   if (oid) await SG.UI.doCmd({ kind: 'relief', cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.relief(cid, oid); } });
 };
@@ -247,7 +254,8 @@ SG.UI.cmdRecruit = async function (cid, preset) {
   var tab = 'free';
   var body = h('div');
   var closeFn;
-  function chance(t) { return Math.round(SG.recruitChance(recruiter, t, fid) * 100); }
+  function chance(t) { return Math.round(SG.UI.coopCalc(recruiter, function () { return SG.recruitChance(recruiter, t, fid); }) * 100); }
+  var coop = SG.UI.coopRow(cid, 'cha', function () { return recruiter; }, function () { render(); });
   function render() {
     body.innerHTML = '';
     var sel = h('select', { class: 'inp', style: { width: '180px' }, onchange: function (e) { recruiter = e.target.value; render(); } });
@@ -255,6 +263,7 @@ SG.UI.cmdRecruit = async function (cid, preset) {
       sel.appendChild(h('option', { value: o, selected: o === recruiter || null, text: SG.name(o) + ' (매력 ' + SG.O(o).cha + ')' }));
     });
     body.appendChild(h('div', { class: 'field' }, [h('label', { text: '설득할 장수' }), sel]));
+    coop.redraw(); body.appendChild(coop);
     body.appendChild(h('div', { class: 'tabs' }, [
       h('button', { class: 'btn small' + (tab === 'free' ? ' on' : ''), text: '이 도시의 재야', onclick: function () { tab = 'free'; render(); } }),
       h('button', { class: 'btn small' + (tab === 'enemy' ? ' on' : ''), text: '다른 세력 장수', onclick: function () { tab = 'enemy'; render(); } })
@@ -281,18 +290,64 @@ SG.UI.cmdRecruit = async function (cid, preset) {
 };
 
 SG.UI.cmdReward = async function (cid) {
-  var S = SG.S, c = S.cities[cid];
-  var offs = SG.officersIn(cid, c.owner).filter(function (o) { return S.forces[c.owner].lord !== o; });
+  var S = SG.S, c = S.cities[cid], fid = c.owner, lord = S.forces[fid].lord;
+  var offs = SG.officersIn(cid, fid).filter(function (o) { return lord !== o; });
   if (!offs.length) { SG.UI.toast('포상할 장수가 없습니다', true); return; }
-  var body = h('div'), info = h('p', { class: 'note' });
-  var tbl;
-  function upd() { info.textContent = '금 ' + SG.COST.reward + '을(를) 내려 충성을 올립니다. 명령 횟수는 쓰지 않습니다. · 남은 금 ' + SG.fmt(c.gold); }
-  tbl = SG.UI.officerTable(offs, { sortBy: { get: function (o) { return -S.off[o].loy; } }, cols: [{ label: '충성', cls: 'n', get: function (o) { return S.off[o].loy; } }],
-    onPick: async function (o) { await SG.UI.doCmd({ kind: 'reward', cid: cid, oid: o, offs: [o], cities: [cid], run: function () { return SG.cmd.reward(cid, o); } }); upd(); tbl.refresh(); } });
+  var gold = Math.min(100, c.gold), item = null;
+  var body = h('div'), info = h('div'), itemBox = h('div', { class: 'rw-items' }), tbl;
+  // 우리 세력 장수가 가진 보물 (군주 것 포함)
+  function ourItems() {
+    return SG.ITEM_IDS.filter(function (id) { var x = S.items[id].o; return x && S.off[x] && S.off[x].s === 'force' && S.off[x].f === fid; });
+  }
+  function expect(o) {
+    var g = gold >= 10 ? SG.rewardGain(gold) : 0;
+    if (item && S.items[item].o !== o) g += 10 + (SG.ITEMS[item].k === 'treasure' ? 5 : 0);
+    return Math.min(g, 100 - S.off[o].loy);
+  }
+  var sl = SG.UI.slider('내릴 금', Math.max(0, Math.min(1000, c.gold)), gold, function (v) { gold = v; upd(); });
+  function upd() {
+    info.innerHTML = '';
+    info.appendChild(SG.UI.brief('금을 많이 줄수록 충성이 더 오릅니다 (100 → 약 +9, 300 → 약 +19, 1000 → 약 +45) · 보물을 함께 내리면 충성 +10 (보물은 +15) · 명령 횟수는 쓰지 않습니다 · 남은 금 ' + SG.fmt(c.gold)));
+    drawItems();
+    if (tbl) tbl.refresh();
+  }
+  function drawItems() {
+    itemBox.innerHTML = '';
+    var its = ourItems();
+    if (!its.length) { itemBox.appendChild(h('p', { class: 'note', text: '우리 세력이 가진 보물이 없습니다. 「인재 탐색」으로 찾을 수 있습니다.' })); return; }
+    itemBox.appendChild(h('div', { class: 'rw-h', text: '함께 내릴 보물 (고르지 않아도 됨)' }));
+    itemBox.appendChild(h('div', { class: 'rw-list' }, its.map(function (id) {
+      var it = SG.ITEMS[id], on = item === id;
+      return h('button', { type: 'button', class: 'rw-item k-' + it.k + (on ? ' on' : ''), title: it.d, onclick: function () { item = on ? null : id; SG.UI.sfx('click'); upd(); } }, [
+        SG.UI.itemImg(id, 40), h('span', null, [h('b', { text: it.n }), h('small', { text: SG.itemBonusText(id) + ' · ' + SG.name(S.items[id].o) })]), on ? h('i', { text: '✓' }) : null]);
+    })));
+  }
+  tbl = SG.UI.officerTable(offs, { sortBy: { get: function (o) { return -S.off[o].loy; } },
+    cols: [{ label: '충성', cls: 'n', get: function (o) { return S.off[o].loy; } }, { label: '오를 충성', cls: 'n', get: function (o) { return expect(o); }, render: function (o) { var e = expect(o); return e ? '+' + e + '쯤' : '—'; } }],
+    onPick: async function (o) {
+      if (gold < 10 && !item) { SG.UI.toast('내릴 금이나 보물을 고르세요', true); return; }
+      if (item && S.items[item].o === o) { SG.UI.toast(SG.josa(SG.name(o) + '은(는) 이미 그 보물을 가지고 있습니다'), true); return; }
+      var it = item, gd = gold >= 10 ? gold : 0;
+      await SG.UI.doCmd({ kind: 'reward', cid: cid, oid: o, offs: [o], cities: [cid], run: function () {
+        var ri = it ? SG.cmd.bestow(it, o, true) : null;
+        if (ri && !ri.ok) return ri;
+        var rg = gd ? SG.cmd.reward(cid, o, gd) : null;
+        if (rg && !rg.ok && !ri) return rg;
+        var msgs = [ri && ri.msg, rg && rg.ok && rg.msg].filter(Boolean);
+        return { ok: true, msg: msgs.join(' '), gain: (ri ? ri.gain : 0) + (rg && rg.ok ? rg.gain : 0), item: it || null, title: '포상', stamp: '賞' };
+      } });
+      item = null;
+      if (gold > c.gold) { gold = Math.max(0, c.gold); }
+      sl.set(gold);
+      upd();
+    } });
   upd();
   body.appendChild(info);
+  body.appendChild(sl);
+  body.appendChild(itemBox);
+  body.appendChild(h('div', { class: 'step' }, [h('i', { text: '賞' }), '상을 받을 장수 (누르면 바로 내림)']));
   body.appendChild(h('div', { class: 'pick-list' }, [tbl]));
-  await SG.UI.modal({ title: '포상 — 누구에게 상을 내릴까요?', body: body, cancel: true, buttons: [{ label: '닫기', value: true }] });
+  await SG.UI.modal({ title: '포상 — 누구에게 상을 내릴까요?', body: body, size: 'wide', cancel: true, buttons: [{ label: '닫기', value: true }] });
 };
 
 // 숫자 슬라이더 한 줄

@@ -64,6 +64,7 @@ SG.prepareAttack = function (from, to, units) {
   if (SG.ADJ[from].indexOf(to) < 0) return { ok: false, msg: '붙어 있는 도시만 공격할 수 있습니다' };
   if (t.owner === fid) return { ok: false, msg: '우리 도시입니다' };
   if (t.owner && SG.isAlly(fid, t.owner)) return { ok: false, msg: '동맹 세력의 도시는 공격할 수 없습니다' };
+  if (c.used && c.used.attack) return { ok: false, msg: '이번 달 이 도시에서는 이미 출진했습니다 (명령마다 한 달에 한 번)' };
   if (!units.length) return { ok: false, msg: '출진할 장수를 고르세요' };
   if (units.length > SG.MAX_UNITS) return { ok: false, msg: '한 번에 ' + SG.MAX_UNITS + '명까지 출진할 수 있습니다' };
   var total = 0;
@@ -92,6 +93,7 @@ SG.launchAttack = async function (from, to, units) {
   SG.takeTroops(c, SG.unitsMix(units), from);
   c.food -= chk.food;
   units.forEach(function (u) { SG.S.off[u.oid].acted = true; u.max = u.n; });
+  (c.used = c.used || {}).attack = 1;
   var atk = { fid: fid, from: from, units: units, train: c.train, morale: c.morale };
 
   // 빈 도시: 바로 점령

@@ -71,3 +71,43 @@ SG.UI.itemList = function () {
     })));
   return SG.UI.modal({ title: '보물 일람', icon: 'reward', body: body, size: 'wide', cancel: true, buttons: [{ label: '닫기', value: true }] });
 };
+
+// ---- 협력 장수 고르기 (명령 창 위에 붙는 줄). 고른 장수는 SG.UI.pendingHelpers 에 담기고 doCmd 가 명령에 붙인다
+SG.UI.CMD_KEY_OF = { '농업 개발': 'agri', '상업 개발': 'comm', '성벽 보수': 'wall', '민심 안정': 'relief', '징병': 'conscript', '훈련': 'train', '수송': 'transport', '출진': 'attack',
+  '인재 탐색': 'search', '등용': 'recruit', '유언비어': 'rumor', '이간': 'sow', '친선': 'gift', '동맹': 'ally', '항복 권고': 'demand', '교역': 'trade' };
+SG.UI.pendingHelpers = null;
+SG.UI.coopRow = function (cid, stat, getMain, onChange, costNote) {
+  var sel = SG.UI.pendingHelpers = [];
+  var wrap = h('div', { class: 'coop-row' });
+  var label = SG.UI.STAT_LABEL && SG.UI.STAT_LABEL[stat] || stat;
+  function draw() {
+    wrap.innerHTML = '';
+    var main = getMain ? getMain() : null;
+    var i = sel.indexOf(main); if (i >= 0) sel.splice(i, 1);
+    var ready = SG.readyOfficers(cid).filter(function (x) { return x !== main; }).sort(function (a, b) { return SG.O(b)[stat] - SG.O(a)[stat]; });
+    if (!ready.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    wrap.appendChild(h('div', { class: 'coop-h' }, [h('b', { text: '협력 장수' }), h('span', { class: 'coop-n', text: sel.length + ' / ' + SG.COOP_MAX }),
+      h('small', { text: '고르면 능력의 일부(50·35·25%)를 ' + (main ? SG.name(main) + '에게' : '맡은 장수에게') + ' 보탭니다 · 협력한 장수도 이번 달 명령을 씁니다' + (costNote ? ' · ' + costNote : '') })]));
+    wrap.appendChild(h('div', { class: 'coop-chips' }, ready.map(function (o) {
+      var on = sel.indexOf(o) >= 0;
+      return h('button', { type: 'button', class: 'coop-chip' + (on ? ' on' : ''), disabled: !on && sel.length >= SG.COOP_MAX || null, onclick: function () {
+        var k = sel.indexOf(o);
+        if (k >= 0) sel.splice(k, 1); else if (sel.length < SG.COOP_MAX) sel.push(o);
+        SG.UI.sfx('click');
+        draw();
+        if (onChange) onChange();
+      } }, [SG.UI.portrait(o, 30), h('span', { text: SG.name(o) }), h('b', { text: label.charAt(0) + SG.O(o)[stat] }), on ? h('i', { text: '助' }) : null]);
+    })));
+  }
+  wrap.redraw = draw;
+  draw();
+  return wrap;
+};
+// 지금 고른 협력 장수를 붙였을 때의 값 (예상치 표시용)
+SG.UI.coopCalc = function (main, fn) {
+  var hs = (SG.UI.pendingHelpers || []).filter(function (x) { return x !== main; });
+  if (!hs.length) return fn();
+  SG._coop = { oid: main, add: SG.coopBonus(hs), n: hs.length };
+  try { return fn(); } finally { SG._coop = null; }
+};

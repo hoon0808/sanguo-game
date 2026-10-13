@@ -246,6 +246,7 @@ SG.UI.resultCard = function (o, r, rows) {
       }
       return row;
     })) : null,
+    r.helpers && r.helpers.length ? h('div', { class: 'rc-help' }, [h('span', { text: '협력' })].concat(r.helpers.map(function (x) { return h('span', { class: 'rc-hp' }, [SG.UI.portrait(x, 30), SG.name(x)]); }))) : null,
     r.item ? h('div', { class: 'rc-item k-' + SG.ITEMS[r.item].k }, [SG.UI.itemImg(r.item, 96), h('div', null, [h('b', null, [h('span', { class: 'it-kind', text: SG.ITEM_KIND[SG.ITEMS[r.item].k] }), SG.ITEMS[r.item].n, h('small', { text: ' ' + SG.ITEMS[r.item].h })]), h('span', { class: 'it-bonus', text: SG.itemBonusText(r.item) }), h('span', { class: 'it-desc', text: SG.ITEMS[r.item].d })])]) : null,
     (r.found && r.found.length) ? h('div', { class: 'rc-found' }, r.found.map(function (oid) { return h('div', null, [SG.UI.portrait(oid, 64), h('span', { text: SG.name(oid) })]); })) : null
   ]);
@@ -255,7 +256,11 @@ SG.UI.resultCard = function (o, r, rows) {
 // ---- 명령 실행 + 장면. o: {kind, cid, oid, run: () => r, cities, offs, fid, target(목표 도시 등 대사용)}
 SG.UI.doCmd = async function (o) {
   var before = SG.UI.snapshot(o);
-  var r = o.run();
+  var hp = (SG.UI.pendingHelpers || []).filter(function (x) { return x !== o.oid; });
+  SG.UI.pendingHelpers = null;
+  if (hp.length) SG.setHelpers(o.oid, hp);
+  var r;
+  try { r = o.run(); } finally { SG.helpers = null; }
   if (!r) return r;
   if (!r.ok) { SG.UI.toast(r.msg, true); return r; }
   SG.log(SG.S.player, r.msg, 'mine');

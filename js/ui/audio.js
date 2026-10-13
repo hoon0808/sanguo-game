@@ -60,6 +60,7 @@ SG.Audio = (function () {
   // 노트북 스피커에서도 잘 들리도록 크게 (2026-10-13: 지도 음악이 너무 작다는 의견). 끝에 리미터로 찢어짐 방지
   A.MUSIC_GAIN = 1.9; A.SFX_GAIN = 2.0;
   A.applyVolumes = function () {
+    if (A.cur && !A.cur._fade) { try { A.cur.volume = musicVolume(); } catch (e) { /* iOS */ } }
     if (!A.g) return;
     A.g.musicBus.gain.value = A.settings.music ? A.settings.musicVol * A.MUSIC_GAIN : 0;
     A.g.sfxBus.gain.value = A.settings.sfx ? A.settings.sfxVol * A.SFX_GAIN : 0;
@@ -432,13 +433,15 @@ SG.Audio = (function () {
       }
     }
   };
-  A.newState = function (tr, t) {
-    return { next: t, bar: 0, k: 0, si: 0, cyc: 0, song: makeSong(tr, 0) };
+  A.newState = function (tr, t, cyc) {
+    cyc = cyc || 0;
+    return { next: t, bar: cyc * 1000, k: 0, si: 0, cyc: cyc, song: makeSong(tr, cyc) };
   };
 
-  A.play = function (name) {
+  // 실시간 연주 (녹음 파일을 못 쓸 때만)
+  A.playSynth = function (name) {
     if (A.trackName === name && A.timer) return;
-    A.stopMusic();
+    A.stopSynth();
     if (!A.ctx || !TRACKS[name]) return; // 아직 소리를 켤 수 없으면 곡 이름도 남기지 않는다 (나중에 누르면 시작)
     A.trackName = name;
     // 바뀔 때 부드럽게
@@ -455,15 +458,7 @@ SG.Audio = (function () {
     }, 300);
     A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 3);
   };
-  // 지킴이: 음악이 켜져 있어야 하는데 멈춰 있으면 다시 (브라우저가 소리를 잠갔다 풀었을 때, 탭을 다시 열었을 때)
-  A.ensure = function () {
-    if (!A.ctx || !A.settings.music || !A.want) return;
-    if (A.ctx.state !== 'running') { try { A.ctx.resume(); } catch (e) { /* 누를 때 다시 */ } return; }
-    if (A.trackName !== A.want || !A.timer) A.play(A.want);
-  };
-  setInterval(function () { A.ensure(); }, 2000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) A.ensure(); });
-  A.stopMusic = function () {
+  A.stopSynth = function () {
     if (A.timer) clearInterval(A.timer);
     A.timer = null;
     if (A.curBus && A.ctx) {
@@ -473,6 +468,75 @@ SG.Audio = (function () {
     }
     A.curBus = null;
   };
+
+  // ---- 배경음악: 미리 녹음한 파일(music/*.mp3)을 <audio> 로 튼다 (tools/render-music.js 로 만듦)
+  // 화면이 바빠도 브라우저가 따로 재생하므로 끊기지 않는다. 곡마다 여러 판을 차례로 이어 튼다.
+  A.FILES = { title: ['title-1'], map: ['map-1', 'map-2', 'map-3'], battle: ['battle-1', 'battle-2'] };
+  A.turn = {};
+  A.els = [];
+  function musicVolume() { return A.settings.music ? Math.min(1, A.settings.musicVol / 0.7) : 0; }
+  function fade(el, to, ms, done) {
+    if (el._fade) clearInterval(el._fade);
+    var from = el.volume, t0 = Date.now();
+    el._fade = setInterval(function () {
+      var k = Math.min(1, (Date.now() - t0) / ms);
+      try { el.volume = Math.max(0, Math.min(1, from + (to - from) * k)); } catch (e) { /* iOS 는 음량을 못 바꿈 */ }
+      if (k >= 1) { clearInterval(el._fade); el._fade = null; if (done) done(); }
+    }, 50);
+  }
+  function nextFile(name) {
+    var L = A.FILES[name], i = A.turn[name] == null ? 0 : (A.turn[name] + 1) % L.length;
+    A.turn[name] = i;
+    return 'music/' + L[i] + '.mp3';
+  }
+  function startFile(name) {
+    var el = new Audio();
+    el.preload = 'auto';
+    el.src = nextFile(name);
+    el.volume = 0;
+    el._track = name;
+    el.addEventListener('ended', function () { if (A.cur === el && A.trackName === name) { A.cur = null; startFile(name); } });
+    el.addEventListener('error', function () {
+      // 파일을 못 읽으면 예전처럼 실시간 연주
+      if (A.cur !== el) return;
+      A.cur = null; A.fileFail = true;
+      if (A.ctx) A.playSynth(name);
+    });
+    A.cur = el;
+    var p = el.play();
+    if (p && p.catch) p.catch(function () { if (A.cur === el) A.blocked = true; });
+    fade(el, musicVolume(), 1200);
+  }
+  A.play = function (name) {
+    if (A.fileFail) return A.playSynth(name);
+    if (!A.FILES[name]) return;
+    if (A.trackName === name && A.cur && !A.cur.paused) return;
+    A.stopMusic();
+    A.trackName = name;
+    A.blocked = false;
+    if (!A.settings.music) return;
+    startFile(name);
+  };
+  A.stopMusic = function () {
+    A.stopSynth();
+    var el = A.cur;
+    A.cur = null;
+    if (el) fade(el, 0, 700, function () { el.pause(); el.removeAttribute('src'); try { el.load(); } catch (e) { /* 무시 */ } });
+  };
+  // 지킴이: 음악이 켜져 있어야 하는데 멈춰 있으면 다시 (브라우저가 소리를 잠갔다 풀었을 때, 탭을 다시 열었을 때)
+  A.ensure = function () {
+    if (!A.settings.music || !A.want || document.hidden) return;
+    if (A.ctx && A.ctx.state !== 'running') { try { A.ctx.resume(); } catch (e) { /* 누를 때 다시 */ } }
+    if (A.fileFail) { if (A.ctx && (A.trackName !== A.want || !A.timer)) A.playSynth(A.want); return; }
+    if (A.trackName !== A.want || !A.cur) { A.trackName = null; A.play(A.want); return; }
+    if (A.cur.paused) { var p = A.cur.play(); if (p && p.catch) p.catch(function () { /* 누를 때 다시 */ }); }
+  };
+  setInterval(function () { A.ensure(); }, 2000);
+  // 다른 창으로 가거나 화면을 끄면 음악을 멈추고, 돌아오면 다시
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (A.cur) A.cur.pause(); if (A.ctx && A.timer) A.stopSynth(), A.trackName = null; }
+    else A.ensure();
+  });
 
   // ---- 효과음
   var SFX = {
@@ -517,12 +581,12 @@ SG.Audio = (function () {
   };
 
   // 시험용: 곡 하나를 오프라인으로 만들어 소리 데이터를 돌려준다
-  A.renderOffline = function (name, seconds, sfxName) {
+  A.renderOffline = function (name, seconds, sfxName, cyc) {
     var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     var ctx = new OAC(2, Math.floor(44100 * seconds), 44100);
     var g = A.build(ctx);
     g.musicBus.gain.value = A.settings.musicVol * A.MUSIC_GAIN; g.sfxBus.gain.value = A.settings.sfxVol * A.SFX_GAIN;
-    if (name) { var tr = TRACKS[name], st = A.newState(tr, 0.05); A.scheduleTrack(g, g.musicBus, tr, st, seconds - 1); }
+    if (name) { var tr = TRACKS[name], st = A.newState(tr, 0.05, cyc); A.scheduleTrack(g, g.musicBus, tr, st, seconds - 1); }
     if (sfxName) SFX[sfxName](g, g.sfxBus, 0.05);
     return ctx.startRendering();
   };

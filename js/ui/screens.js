@@ -89,7 +89,7 @@ SG.UI.scenarioSelect = function () {
       return h('span', { class: 'sc-face', title: o.n + ' · 도시 ' + Object.keys(f.cities).length, style: { borderColor: SG.COLORS[f.color] || f.color } }, [h('img', { alt: '', src: SG.UI.portraitSrc(f.lord, true) })]);
     }).concat(forces.length > 6 ? [h('span', { class: 'sc-more', text: '+' + (forces.length - 6) })] : []));
     grid.appendChild(h('button', { class: 'sc-card', type: 'button', onclick: function () { SG.UI.lordSelect(sc.id); } }, [
-      h('div', { class: 'sc-map' }, [SG.UI.miniMap(sc), h('span', { class: 'sc-year' + (sc.heroes ? ' hero' : ''), text: sc.heroes ? '假' : String(sc.year) })]),
+      h('div', { class: 'sc-map arted', style: { backgroundImage: 'url(img/scenario/' + sc.id + '.jpg)' } }, [h('div', { class: 'sc-mini' }, [SG.UI.miniMap(sc)]), h('span', { class: 'sc-year' + (sc.heroes ? ' hero' : ''), text: sc.heroes ? '假' : String(sc.year) })]),
       h('div', { class: 'sc-info' }, [
         h('div', { class: 'sc-when', text: sc.heroes ? '가상 시나리오' : sc.year + '년 ' + sc.month + '월' }),
         h('h3', { text: sc.name }),
@@ -173,7 +173,12 @@ SG.UI.lordSelect = function (scId) {
       h('h2', { text: (sc.heroes ? '가상 · ' : sc.year + '년 · ') + sc.name }),
       h('span', { class: 'note', text: '군주 선택' })
     ]),
-    h('div', { class: 'lord-wrap2' }, [mapBox, h('div', { class: 'lord-side' }, [detail, list])])
+    h('div', { class: 'lord-wrap2' }, [mapBox, h('div', { class: 'lord-side' }, [
+      // 시나리오 그림 (Higgsfield, img/scenario/<id>.jpg)
+      h('div', { class: 'ld-art', style: { backgroundImage: 'url(img/scenario/' + sc.id + '.jpg)' } }, [
+        h('div', { class: 'ld-art-cap' }, [h('b', { text: sc.name }), h('span', { text: sc.heroes ? '가상 시나리오' : sc.year + '년 ' + sc.month + '월' })])
+      ]),
+      detail, list])])
   ]));
   map = new SG.UI.Map(mapBox, { onClick: function (cid) { var o = SG.S.cities[cid].owner; if (o) choose(o); } });
   render();

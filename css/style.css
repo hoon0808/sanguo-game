@@ -1424,3 +1424,20 @@ html.portrait .title2.painted .heroes { display: none; }
 html.portrait .title2.painted .t-bg { inset: 0; background-position: 80% 30%; animation: none; }
 html.portrait .title2.painted .t-fade { background: linear-gradient(to bottom, transparent 0%, transparent 34%, color-mix(in srgb, var(--surface) 82%, transparent) 52%, color-mix(in srgb, var(--surface) 92%, transparent) 100%); }
 html.portrait .title2.painted .t-body { align-content: end; padding-bottom: 28px; }
+/* 군주 선택: 위에 시나리오 그림, 군주 초상이 그림 아래쪽에 걸쳐 앉는다 */
+.ld-art { position: relative; flex: none; height: 190px; background: #2b1a10 center 55% / cover no-repeat; }
+.ld-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(10, 6, 2, .15), transparent 35%, color-mix(in srgb, var(--surface) 60%, transparent) 78%, var(--surface) 100%); }
+.ld-art-cap { position: absolute; left: 18px; top: 14px; z-index: 1; display: flex; flex-direction: column; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, .8); }
+.ld-art-cap b { font-family: var(--f-display); font-weight: 400; font-size: 26px; letter-spacing: .08em; }
+.ld-art-cap span { font-size: 12px; letter-spacing: .15em; opacity: .9; }
+.ld-art + .lord-detail { position: relative; margin-top: -70px; border-bottom: 1px solid var(--line); }
+html.compact .ld-art { height: 96px; }
+html.compact .ld-art-cap b { font-size: 16px; } html.compact .ld-art-cap { left: 10px; top: 6px; }
+html.compact .ld-art + .lord-detail { margin-top: -36px; }
+html.portrait .ld-art { height: 120px; }
+html.portrait .ld-art + .lord-detail { margin-top: -44px; }
+/* 시나리오 카드: 위는 시나리오 그림, 세력 지도는 오른쪽 아래 작은 창 */
+.sc-map.arted { background: #2b1a10 center / cover no-repeat; transition: background-size .4s; }
+.sc-card:hover .sc-map.arted { background-size: 108%; }
+.sc-mini { position: absolute; right: 8px; bottom: 8px; width: 38%; aspect-ratio: 980 / 790; border: 2px solid rgba(246, 223, 160, .85); border-radius: 3px; overflow: hidden; background: var(--sea); box-shadow: 0 6px 16px rgba(0, 0, 0, .5); }
+.sc-mini .minimap { width: 100%; height: 100%; display: block; }

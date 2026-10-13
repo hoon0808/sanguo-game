@@ -1403,3 +1403,8 @@ html.portrait .duel-acts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hall-bg { position: absolute; inset: 0; background: #2b1a10 center 40% / cover no-repeat; animation: csPan 20s ease-out both; transform-origin: 50% 45%; }
 .hall-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(12, 6, 2, .5) 100%), linear-gradient(to top, rgba(12, 8, 4, .55), transparent 40%); }
 .hall .hall-curtain, .cs-hall .hall-curtain { height: 30px; background-size: 90px 30px; opacity: .85; }
+/* 전장 장면 그림: 천천히 다가가고 아래쪽 어둡게 */
+.fs-bg.painted { animation: csPan 22s ease-out both; transform-origin: 50% 60%; }
+.field-scene::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(to top, rgba(12, 8, 4, .5), transparent 40%), radial-gradient(ellipse at 50% 45%, transparent 50%, rgba(12, 6, 2, .4) 100%); }
+/* 육각 전장: 그림 바탕 위 칸 테두리를 또렷하게 */
+.bt .hex.tex { stroke: rgba(40, 30, 16, .45); stroke-width: 1.2; }

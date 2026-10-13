@@ -20,6 +20,8 @@ SG.UI.hexRand = function (c, r, k) {
   var x = Math.sin((c + 1) * 127.1 + (r + 1) * 311.7 + (k || 0) * 74.7) * 43758.5453;
   return x - Math.floor(x);
 };
+// 육각 전장 지형 그림 (img/terrain/*.jpg). 없는 지형은 예전 색으로
+SG.UI.TERRAIN_TEX = { plain: 'plain', forest: 'forest', hill: 'hill', mountain: 'mountain', water: 'water', castle: 'castle', keep: 'castle', gate: 'castle', wall: 'wall' };
 SG.UI.DUEL_LINES = [
   '{a}의 일격이 바람을 가른다!', '{d}이(가) 간신히 막아 낸다!', '창과 칼이 부딪혀 불꽃이 튄다!', '{a}이(가) 말머리를 돌려 다시 달려든다!',
   '{d}의 반격이 매섭다!', '두 장수가 엇갈리며 숨을 고른다…', '양군의 함성이 하늘을 찌른다!', '{a}의 무기가 {d}의 투구를 스친다!'
@@ -65,6 +67,12 @@ SG.UI.tactical = function (atk, def) {
     S2('feColorMatrix', { type: 'matrix', values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0', in: 'n' }, tex);
     var glow = S2('filter', { id: 'bt-glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
     S2('feGaussianBlur', { stdDeviation: 3 }, glow);
+    // 지형 그림 (Higgsfield 로 그린 위에서 본 바탕). 전장 크기만 한 무늬라 이음매가 없다
+    var TEX = SG.UI.TERRAIN_TEX;
+    Object.keys(TEX).forEach(function (k) {
+      var pt = S2('pattern', { id: 'tx-' + k, patternUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, defs);
+      S2('image', { href: 'img/terrain/' + TEX[k] + '.jpg', x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, pt);
+    });
     var gMap = S2('g', { class: 'bt-terrain' }, svgEl);
     var gDeco = S2('g', { class: 'bt-deco' }, svgEl);
     S2('rect', { x: 0, y: 0, width: W, height: H, filter: 'url(#bt-tex)', class: 'bt-grain' }, svgEl);
@@ -76,16 +84,17 @@ SG.UI.tactical = function (atk, def) {
       for (var r = 0; r < SG.T.ROWS; r++) for (var c = 0; c < SG.T.COLS; c++) {
         (function (c, r) {
           var p = SG.UI.hexXY(c, r), tt = B.map[SG.T.key(c, r)], rnd = function (k) { return SG.UI.hexRand(c, r, k); };
-          var poly = S2('polygon', { points: SG.UI.hexPoints(p.x, p.y, R - 0.4), class: 'hex ' + tt }, gMap);
+          var poly = S2('polygon', { points: SG.UI.hexPoints(p.x, p.y, R - 0.4), class: 'hex ' + tt + (TEX[tt] ? ' tex' : '') }, gMap);
+          if (TEX[tt]) poly.style.fill = 'url(#tx-' + tt + ')';
           var tone = rnd(0);
           if (tone > 0.55) S2('polygon', { points: SG.UI.hexPoints(p.x, p.y, R - 0.4), class: 'hex-tone ' + (tone > 0.8 ? 'dk' : 'lt'), 'pointer-events': 'none' }, gMap);
           poly.addEventListener('click', function () { onHex(c, r); });
           var d = gDeco;
-          if (tt === 'plain' && rnd(1) > 0.45) for (var g = 0; g < 3; g++) {
+          if (tt === 'plain' && !TEX.plain && rnd(1) > 0.45) for (var g = 0; g < 3; g++) {
             var gx = p.x + (rnd(g + 2) - 0.5) * R, gy = p.y + (rnd(g + 5) - 0.5) * R * 0.9;
             S2('path', { d: 'M' + gx + ',' + gy + ' l-2,-5 M' + gx + ',' + gy + ' l0,-6 M' + gx + ',' + gy + ' l2,-5', class: 'grass' }, d);
           }
-          if (tt === 'forest') for (var t = 0; t < 4; t++) {
+          if (tt === 'forest') for (var t = 0; t < (TEX.forest ? 2 : 4); t++) {
             var tx = p.x + [-10, 8, -2, 11][t] + (rnd(t) - 0.5) * 4, ty = p.y + [2, -6, 10, 7][t];
             var s = 6 + rnd(t + 3) * 3;
             S2('rect', { x: tx - 1, y: ty, width: 2, height: 5, class: 'trunk' }, d);
@@ -104,7 +113,7 @@ SG.UI.tactical = function (atk, def) {
               S2('path', { d: 'M' + (mx - w * 0.32) + ',' + (top + m[1] * 0.32) + ' L' + mx + ',' + top + ' L' + (mx + w * 0.32) + ',' + (top + m[1] * 0.32) + ' L' + mx + ',' + (top + m[1] * 0.22) + ' Z', class: 'snow' }, d);
             });
           }
-          if (tt === 'water') for (var wv = 0; wv < 2; wv++) {
+          if (tt === 'water') for (var wv = 0; wv < (TEX.water ? 1 : 2); wv++) {
             S2('path', { d: 'M' + (p.x - 14) + ',' + (p.y - 4 + wv * 9) + ' q4,-4 8,0 t8,0 t8,0', class: 'wave', style: 'animation-delay:' + (rnd(wv) * -2).toFixed(2) + 's' }, d);
           }
           if (tt === 'wall') {

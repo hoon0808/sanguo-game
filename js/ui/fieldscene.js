@@ -4,7 +4,25 @@
 var SG = SG || {};
 
 // 들판·먼 산·수비 성·양쪽 군대 그림 (SVG 글자)
+// 전장 그림 (Higgsfield): 성을 치는 싸움 / 들판 싸움. 그림 위에 양쪽 세력 빛깔 깃발과 화살비·흙먼지만 덧그린다
+SG.UI.FIELD_IMG = true;
 SG.UI.fieldBackdrop = function (atkColor, defColor, walled) {
+  if (SG.UI.FIELD_IMG) {
+    var q = '<svg class="fs-bg painted" viewBox="0 0 1100 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+      '<image href="img/scene/' + (walled ? 'battle-siege' : 'battle-field') + '.jpg" x="0" y="0" width="1100" height="500" preserveAspectRatio="xMidYMid slice"/>';
+    function flag(x, y, col, big) {
+      var w = big ? 46 : 30, hh = big ? 22 : 15;
+      return '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + (y + (big ? 80 : 46)) + '" stroke="#2a1d10" stroke-width="' + (big ? 3 : 2) + '"/>' +
+        '<path class="fs-flag" d="M' + x + ' ' + y + ' q' + (w / 2) + ' -5 ' + w + ' 4 l-7 ' + (hh / 2) + ' l7 ' + (hh / 2) + ' q-' + (w / 2) + ' -8 -' + w + ' -4z" fill="' + col + '" stroke="rgba(0,0,0,.4)"/>';
+    }
+    q += '<g class="fs-army atk">' + [[70, 250, 1], [200, 262, 1], [330, 274, 1], [140, 300, 0], [270, 310, 0]].map(function (f) { return flag(f[0], f[1], atkColor, f[2]); }).join('') + '</g>';
+    var dF = walled ? [[700, 118, 0], [800, 112, 0], [905, 100, 0], [1010, 92, 0], [760, 170, 1]] : [[760, 250, 1], [880, 258, 1], [990, 266, 1], [820, 300, 0], [940, 306, 0]];
+    q += '<g class="fs-city">' + dF.map(function (f) { return flag(f[0], f[1], defColor, f[2]); }).join('') + '</g>';
+    q += '<g class="fs-arrows">';
+    for (var a2 = 0; a2 < 14; a2++) { var ax2 = 380 + (a2 * 47) % 260, ay2 = 140 + (a2 * 31) % 90; q += '<line x1="' + ax2 + '" y1="' + ay2 + '" x2="' + (ax2 + 26) + '" y2="' + (ay2 + 12) + '" style="animation-delay:' + (a2 * 0.09).toFixed(2) + 's"/>'; }
+    q += '</g><g class="fs-dust"><ellipse cx="420" cy="350" rx="120" ry="24"/><ellipse cx="580" cy="310" rx="90" ry="16"/></g>';
+    return q + '</svg>';
+  }
   var s = '<svg class="fs-bg" viewBox="0 0 1100 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
     '<defs><linearGradient id="fs-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3a52"/><stop offset=".45" stop-color="#c8744a"/><stop offset=".62" stop-color="#f0c27e"/></linearGradient>' +
     '<linearGradient id="fs-ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d7445"/><stop offset="1" stop-color="#2e2a18"/></linearGradient>' +

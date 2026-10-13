@@ -48,10 +48,16 @@ SG.fmt = function (n) { return Math.round(n).toLocaleString('ko-KR'); };
 
 // ---- 조사 고르기: '조조이(가)' → '조조가', '관우을(를)' → '관우를'
 SG.JOSA = { '이(가)': ['이', '가'], '을(를)': ['을', '를'], '은(는)': ['은', '는'], '과(와)': ['과', '와'], '와(과)': ['과', '와'], '(으)로': ['으로', '로'] };
+// 숫자로 끝나는 말의 받침 (읽는 소리 기준: 13,000 → 만삼천 → ㄴ, 21 → 이십일 → ㄹ). 0 = 받침 없음, 8 = ㄹ
+SG.numJong = function (num) {
+  var d = num.replace(/,/g, ''), z = d.length - d.replace(/0+$/, '').length;
+  if (z > 0) return 1; // 십·백·천·만 모두 받침
+  return [0, 8, 0, 1, 0, 0, 1, 8, 8, 0][+d.charAt(d.length - 1)];
+};
 SG.josa = function (text) {
   if (!text || text.indexOf('(') < 0) return text;
-  return String(text).replace(/([가-힣])(이\(가\)|을\(를\)|은\(는\)|과\(와\)|와\(과\)|\(으\)로|\(이\))/g, function (m, ch, j) {
-    var code = ch.charCodeAt(0) - 0xAC00, jong = code % 28, pair = SG.JOSA[j];
+  return String(text).replace(/([가-힣]|[0-9][0-9,]*)(이\(가\)|을\(를\)|은\(는\)|과\(와\)|와\(과\)|\(으\)로|\(이\))/g, function (m, ch, j) {
+    var jong = /^[0-9]/.test(ch) ? SG.numJong(ch) : (ch.charCodeAt(0) - 0xAC00) % 28, pair = SG.JOSA[j];
     if (j === '(으)로') return ch + (jong === 0 || jong === 8 ? '로' : '으로');
     if (j === '(이)') return ch + (jong ? '이' : '');
     return ch + (jong ? pair[0] : pair[1]);

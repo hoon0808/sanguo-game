@@ -49,7 +49,7 @@ SG.garrisonWant = function (cid) {
   var th = SG.threat(cid), size = SG.CITIES[cid].size;
   return th.front ? Math.min(60000, Math.max(th.max, 7000 + size * 4000)) : 3000 + size * 1000;
 };
-// 위임 태수의 병력 조정: 전방이면 이웃 후방 도시의 남는 병사를 데려오고, 후방이면 남는 병사를 이웃 전방 도시로 보낸다.
+// 위임 태수의 병력 조정: 전방이면 장수가 이웃 후방 도시에 가서 남는 병사를 이끌고 돌아오고(수송), 후방이면 장수가 남는 병사를 이끌고 이웃 전방 도시로 옮겨 간다(이동).
 // 일은 이 도시 장수 중 정치가 가장 낮은 한두 명이 맡는다 (개발 잘하는 장수는 남겨 둔다).
 SG.delegLogistics = function (cid) {
   var S = SG.S, c = S.cities[cid], fid = c.owner;
@@ -74,7 +74,7 @@ SG.delegLogistics = function (cid) {
       .filter(function (x) { return x[1] >= 1000; }).sort(function (a, b) { return b[1] - a[1]; }).forEach(function (x) {
         if (have < 1000 || jobs >= 2 || pool.length < 2) return;
         var n = Math.floor(Math.min(have, x[1]) / 100) * 100;
-        var r = SG.cmd.transport(cid, pool.shift(), cid, x[0], n, foodFor(cid, n));
+        var r = SG.cmd.move(cid, [pool.shift()], x[0], n, 0, foodFor(cid, n)); // 장수가 병사를 이끌고 옮겨 간다
         if (r.ok) { have -= n; jobs++; }
       });
   }

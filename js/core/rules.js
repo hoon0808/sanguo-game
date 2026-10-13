@@ -175,7 +175,7 @@ SG.cmd.reward = function (cid, target) {
   return { ok: true, msg: msg, gain: g };
 };
 
-// ---- 이동: 장수가 이웃 우리 도시로 옮겨 가 그곳에 머문다 (화면에서는 장수만. 컴퓨터는 병사·물자도 함께 보낸다)
+// ---- 이동: 장수가 병사를 이끌고 이웃 우리 도시로 옮겨 가 그곳에 머문다 (화면에서는 장수·병사. 컴퓨터는 금·식량도 함께 보낸다)
 SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   var c = SG.S.cities[cid], d = SG.S.cities[dest];
   if (!d || SG.ADJ[cid].indexOf(dest) < 0) return fail('붙어 있는 도시로만 이동할 수 있습니다');
@@ -199,11 +199,13 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   if (soldiers) extra.push('병사 ' + SG.fmt(soldiers));
   if (gold) extra.push('금 ' + SG.fmt(gold));
   if (food) extra.push('식량 ' + SG.fmt(food));
-  return { ok: true, msg: oids.map(SG.name).join(', ') + '이(가) ' + SG.cityName(dest) + '(으)로 이동했다' + (extra.length ? ' (' + extra.join(', ') + ')' : '') + '.' };
+  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 이동했다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '.';
+  if (SG.cmdLog) SG.cmdLog.push({ oid: oids[0], msg: SG.josa(msg), ok: true });
+  return { ok: true, msg: msg };
 };
 
-// ---- 수송: cid 의 장수 oid 가 이웃 우리 도시 src → dest 로 병사·금·식량을 실어 나르고 돌아온다 (장수는 제자리, 이번 달 행동 끝).
-// 플레이어는 src = cid (보내기), 위임 태수는 dest = cid (데려오기)도 쓴다.
+// ---- 수송: cid 의 장수 oid 가 이웃 우리 도시 src → dest 로 금·식량을 실어 나르고 돌아온다 (장수는 제자리, 이번 달 행동 끝).
+// 플레이어 화면은 금·식량만 (병사는 「이동」). 위임 태수가 데려올 때(dest = cid)는 장수가 가서 병사를 이끌고 돌아온다.
 SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   var a = SG.S.cities[src], b = SG.S.cities[dest];
   if (src !== cid && dest !== cid) return fail('이 도시와 이웃 도시 사이만 옮길 수 있습니다');
@@ -222,8 +224,11 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   a.food -= food; b.food += food;
   a.gold -= gold; b.gold += gold;
   var what = [soldiers ? '병사 ' + SG.fmt(soldiers) : '', gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
-  return done(oid, src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보내고 돌아왔다.'
-    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + what + '을(를) 데려왔다.', { moved: soldiers, src: src, dest: dest });
+  // 병사는 장수가 이끈다: 데려올 때는 장수가 그 도시에 가서 병사를 이끌고 돌아온다
+  var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보내고 돌아왔다.'
+    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 ' + what + '을(를) 이끌고 돌아왔다.'
+    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + what + '을(를) 실어 왔다.';
+  return done(oid, msg, { moved: soldiers, src: src, dest: dest });
 };
 
 // ---- 주인 없는 도시 차지 (전투 없이)

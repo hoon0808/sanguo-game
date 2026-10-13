@@ -27,7 +27,7 @@ SG.UI.CMD_GROUPS = [
 SG.UI.CMD_META = {
   '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
-  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수가 옮겨 감'], '수송': ['transport', '병사·금·식량'],
+  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수·병사'], '수송': ['transport', '금·식량'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
   '친선': ['gift', '금 300 · 매력'], '동맹': ['ally', '매력'], '항복 권고': ['surrender', '매력']
 };
@@ -279,18 +279,20 @@ SG.UI.cmdMove = async function (cid) {
     var i = picked.indexOf(o); if (i >= 0) picked.splice(i, 1); else picked.push(o);
     card.classList.toggle('sel', picked.indexOf(o) >= 0);
   } });
+  var sS = SG.UI.slider('데려갈 병사', c.soldiers, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 옮겨 가 그 도시에 머뭅니다 · 병사·금·식량은 「군사 → 수송」으로 보내세요'),
+    SG.UI.brief('장수가 병사를 이끌고 옮겨 가 그 도시에 머뭅니다 · 금·식량은 「군사 → 수송」으로 보내세요'),
     h('div', { class: 'field' }, [h('label', { text: '목적지' }), sel]),
-    h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능).' }),
+    sS,
+    h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능). 병사는 장수가 데려갑니다.' }),
     h('div', { class: 'pick-list' }, [tbl])
   ]);
   var ok = await SG.UI.modal({ title: '이동 — 누가 어디로 갈까요?', body: body, cancel: false, buttons: [{ label: '취소', value: false }, { label: '이동', value: true, cls: 'primary', check: function () {
     if (!picked.length) { SG.UI.toast('장수를 한 명 이상 고르세요', true); return false; } return true;
   } }] });
   if (!ok) return;
-  var dest = sel.value;
-  await SG.UI.doCmd({ kind: 'move', cid: cid, oid: picked[0], offs: picked.slice(), cities: [cid, dest], target: dest, run: function () { return SG.cmd.move(cid, picked, dest, 0, 0, 0); } });
+  var dest = sel.value, ns = sS.get();
+  await SG.UI.doCmd({ kind: 'move', cid: cid, oid: picked[0], offs: picked.slice(), cities: [cid, dest], target: dest, run: function () { return SG.cmd.move(cid, picked, dest, ns, 0, 0); } });
 };
 // 목적지 고르기 (이웃 우리 도시)
 SG.UI.destSelect = function (dests) {
@@ -300,7 +302,7 @@ SG.UI.destSelect = function (dests) {
     return h('option', { value: d, text: SG.cityName(d) + ' (병사 ' + SG.fmt(t.soldiers) + ' · 금 ' + SG.fmt(t.gold) + ' · 식량 ' + SG.fmt(t.food) + (SG.threat(d).front ? ' · 전방' : '') + ')' });
   }));
 };
-// 수송: 장수 한 명이 병사·금·식량을 실어 보내고 돌아온다
+// 수송: 장수 한 명이 금·식량을 실어 보내고 돌아온다 (병사는 「이동」으로 장수가 데려간다)
 SG.UI.cmdTransport = async function (cid) {
   var S = SG.S, c = S.cities[cid];
   var dests = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === c.owner; });
@@ -312,22 +314,22 @@ SG.UI.cmdTransport = async function (cid) {
   var tbl = SG.UI.officerCards(ready, { onPick: function (o, card) {
     picked = o; [].forEach.call(tbl.querySelectorAll('.ocard'), function (x) { x.classList.remove('sel'); }); card.classList.add('sel');
   } });
-  var sS = SG.UI.slider('병사', c.soldiers, 0), sG = SG.UI.slider('금', c.gold, 0), sF = SG.UI.slider('식량', c.food, 0);
+  var sG = SG.UI.slider('금', c.gold, 0), sF = SG.UI.slider('식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 수레를 몰고 갔다가 돌아옵니다 · 장수는 이 도시에 그대로 남습니다'),
+    SG.UI.brief('장수가 금·식량을 수레에 싣고 갔다가 돌아옵니다 · 장수는 이 도시에 그대로 남습니다 · 병사는 「인사 → 이동」'),
     h('div', { class: 'field' }, [h('label', { text: '보낼 곳' }), sel]),
-    sS, sG, sF,
+    sG, sF,
     h('p', { class: 'note', text: '수레를 몰 장수 한 명을 고르세요 (이번 달 명령을 씁니다).' }),
     h('div', { class: 'pick-list' }, [tbl])
   ]);
   var ok = await SG.UI.modal({ title: '수송 — 무엇을 어디로 보낼까요?', body: body, cancel: false, buttons: [{ label: '취소', value: false }, { label: '수송', value: true, cls: 'primary', check: function () {
     if (!picked) { SG.UI.toast('수레를 몰 장수를 고르세요', true); return false; }
-    if (!sS.get() && !sG.get() && !sF.get()) { SG.UI.toast('보낼 병사·금·식량을 정하세요', true); return false; }
+    if (!sG.get() && !sF.get()) { SG.UI.toast('보낼 금·식량을 정하세요', true); return false; }
     return true;
   } }] });
   if (!ok) return;
-  var dest = sel.value, ns = sS.get(), ng = sG.get(), nf = sF.get();
-  await SG.UI.doCmd({ kind: 'transport', cid: cid, oid: picked, offs: [picked], cities: [cid, dest], target: dest, run: function () { return SG.cmd.transport(cid, picked, cid, dest, ns, nf, ng); } });
+  var dest = sel.value, ng = sG.get(), nf = sF.get();
+  await SG.UI.doCmd({ kind: 'transport', cid: cid, oid: picked, offs: [picked], cities: [cid, dest], target: dest, run: function () { return SG.cmd.transport(cid, picked, cid, dest, 0, nf, ng); } });
 };
 
 // 양군 패널: 도시 지형 배경 + 세력 깃발 + 장수 얼굴 + 한 줄 설명. extra 는 맨 아래에 붙는 요소

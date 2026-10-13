@@ -19,7 +19,8 @@ SG.UI.CMD_SCENES = {
   search: { bg: 'road', lines: ['숨은 인재를 찾아 길을 나서겠습니다.', '산속 초가까지 샅샅이 찾아보겠습니다.'], sfx: 'found' },
   recruit: { bg: 'road', lines: ['제가 직접 찾아가 설득해 보겠습니다.', '진심을 다하면 마음이 움직일 것입니다.'], sfx: 'recruit' },
   reward: { bg: 'hall', lines: ['이 은혜, 목숨을 바쳐 갚겠습니다!', '황공하옵니다. 더욱 힘써 섬기겠습니다.'], sfx: 'coin', speaker: 'target' },
-  move: { bg: 'road', lines: ['짐을 꾸려 곧 출발하겠습니다.', '수레를 몰아라! 해 지기 전에 닿아야 한다.'], sfx: 'march' },
+  move: { bg: 'road', lines: ['짐을 꾸려 곧 출발하겠습니다. 그곳에서 주공을 위해 힘쓰겠습니다.', '말을 내라! 해 지기 전에 닿아야 한다.'], sfx: 'march' },
+  transport: { bg: 'road', lines: ['수레를 몰아 실어다 주고 곧 돌아오겠습니다.', '짐을 단단히 묶어라! 한 톨도 흘리지 말고 전하고 오자.'], sfx: 'march' },
   rumor: { bg: 'night', lines: ['밤을 틈타 저잣거리에 헛소문을 퍼뜨리고 오겠습니다.', '말 한마디가 칼보다 무섭지요. 흐흐.'], sfx: 'confuse' },
   sow: { bg: 'night', lines: ['적의 마음에 의심의 씨앗을 심어 두지요.', '그자의 주군이 그를 의심하게 만들겠습니다.'], sfx: 'confuse' },
   gift: { bg: 'hall', lines: ['예물을 갖추어 사신으로 다녀오겠습니다.', '좋은 이웃이 되자고 잘 전하겠습니다.'], sfx: 'coin' },
@@ -37,7 +38,7 @@ Object.assign(SG.UI.CMD_SCENES, {
   riot: { bg: 'riot', lines: ['백성들이 횃불을 들고 관아로 몰려왔습니다! 민심을 돌보지 않으면 또 일어날 것입니다.'], sfx: 'fire' }
 });
 SG.UI.CMD_TITLE = { locust: '메뚜기 떼', plague: '역병', flood: '홍수', drought: '가뭄', quake: '지진', bumper: '풍년', riot: '반란', attack: '출진', agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수', relief: '민심 안정', conscript: '징병', train: '훈련', search: '인재 탐색', recruit: '등용', reward: '포상',
-  move: '이동·수송', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고' };
+  move: '이동', transport: '수송', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고' };
 
 // ---- 배경 그림
 SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drought: 'field', plague: 'village', riot: 'village', quake: 'wall' };

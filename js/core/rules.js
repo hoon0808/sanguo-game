@@ -175,7 +175,7 @@ SG.cmd.reward = function (cid, target) {
   return { ok: true, msg: msg, gain: g };
 };
 
-// ---- 이동: 장수가 병사를 이끌고 이웃 우리 도시로 옮겨 가 그곳에 머문다 (화면에서는 장수·병사. 컴퓨터는 금·식량도 함께 보낸다)
+// ---- 이동: 장수가 병사·금·식량을 가지고 이웃 우리 도시로 옮겨 가 그곳에 머문다
 SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   var c = SG.S.cities[cid], d = SG.S.cities[dest];
   if (!d || SG.ADJ[cid].indexOf(dest) < 0) return fail('붙어 있는 도시로만 이동할 수 있습니다');

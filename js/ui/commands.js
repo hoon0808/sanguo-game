@@ -27,7 +27,7 @@ SG.UI.CMD_GROUPS = [
 SG.UI.CMD_META = {
   '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
-  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수·병사'], '수송': ['transport', '금·식량'],
+  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
   '친선': ['gift', '금 300 · 매력'], '동맹': ['ally', '매력'], '항복 권고': ['surrender', '매력']
 };
@@ -279,20 +279,20 @@ SG.UI.cmdMove = async function (cid) {
     var i = picked.indexOf(o); if (i >= 0) picked.splice(i, 1); else picked.push(o);
     card.classList.toggle('sel', picked.indexOf(o) >= 0);
   } });
-  var sS = SG.UI.slider('데려갈 병사', c.soldiers, 0);
+  var sS = SG.UI.slider('데려갈 병사', c.soldiers, 0), sG = SG.UI.slider('가져갈 금', c.gold, 0), sF = SG.UI.slider('가져갈 식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 병사를 이끌고 옮겨 가 그 도시에 머뭅니다 · 금·식량은 「군사 → 수송」으로 보내세요'),
+    SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
     h('div', { class: 'field' }, [h('label', { text: '목적지' }), sel]),
-    sS,
-    h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능). 병사는 장수가 데려갑니다.' }),
+    sS, sG, sF,
+    h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능).' }),
     h('div', { class: 'pick-list' }, [tbl])
   ]);
   var ok = await SG.UI.modal({ title: '이동 — 누가 어디로 갈까요?', body: body, cancel: false, buttons: [{ label: '취소', value: false }, { label: '이동', value: true, cls: 'primary', check: function () {
     if (!picked.length) { SG.UI.toast('장수를 한 명 이상 고르세요', true); return false; } return true;
   } }] });
   if (!ok) return;
-  var dest = sel.value, ns = sS.get();
-  await SG.UI.doCmd({ kind: 'move', cid: cid, oid: picked[0], offs: picked.slice(), cities: [cid, dest], target: dest, run: function () { return SG.cmd.move(cid, picked, dest, ns, 0, 0); } });
+  var dest = sel.value, ns = sS.get(), ng = sG.get(), nf = sF.get();
+  await SG.UI.doCmd({ kind: 'move', cid: cid, oid: picked[0], offs: picked.slice(), cities: [cid, dest], target: dest, run: function () { return SG.cmd.move(cid, picked, dest, ns, ng, nf); } });
 };
 // 목적지 고르기 (이웃 우리 도시)
 SG.UI.destSelect = function (dests) {

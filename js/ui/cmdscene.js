@@ -359,7 +359,8 @@ SG.UI.noteStaff = function (o, before, r) {
     if (before.st[oid] !== so.s + '/' + so.f) mark(so.c, oid, 'joined', true);
     else {
       if (before.loy[oid] !== so.loy) mark(so.c, oid, 'loy', so.loy - before.loy[oid]);
-      if (before.at[oid] !== so.c) {
+      if (so.march && before.at[oid] === so.c) (d.out[so.c] = d.out[so.c] || []).push([oid, so.march]);
+      else if (before.at[oid] !== so.c) {
         mark(so.c, oid, 'arrived', before.at[oid]);
         (d.out[before.at[oid]] = d.out[before.at[oid]] || []).push([oid, so.c]);
         if (d.p[before.at[oid]]) delete d.p[before.at[oid]][oid];

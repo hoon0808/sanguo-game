@@ -374,7 +374,7 @@ SG.UI.cmdMove = async function (cid) {
   } });
   var sS = SG.UI.slider('데려갈 병사', c.soldiers, 0), sG = SG.UI.slider('가져갈 금', c.gold, 0), sF = SG.UI.slider('가져갈 식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
+    SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 길을 가는 동안이라 다음 달(턴 종료 뒤)에 도착합니다 · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
     h('div', { class: 'field' }, [h('label', { text: '목적지' }), sel]),
     sS, sG, sF,
     h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능).' }),

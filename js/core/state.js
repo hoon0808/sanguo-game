@@ -103,7 +103,7 @@ SG.officersOf = function (fid) {
 SG.officersIn = function (cid, fid) {
   return Object.keys(SG.S.off).filter(function (o) {
     var x = SG.S.off[o];
-    return x.s === 'force' && x.c === cid && (fid === undefined || x.f === fid);
+    return x.s === 'force' && x.c === cid && !x.march && (fid === undefined || x.f === fid);
   });
 };
 SG.freeIn = function (cid, onlyFound) {

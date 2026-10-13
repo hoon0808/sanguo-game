@@ -8,7 +8,7 @@ SG.cmd = {};
 // 장수가 이 도시에서 명령을 받을 수 있는지
 SG.ready = function (cid, oid) {
   var o = SG.S.off[oid], c = SG.S.cities[cid];
-  return !!o && !!c && o.s === 'force' && o.c === cid && o.f === c.owner && !o.acted;
+  return !!o && !!c && o.s === 'force' && o.c === cid && !o.march && o.f === c.owner && !o.acted;
 };
 SG.readyOfficers = function (cid) {
   return SG.officersIn(cid, SG.S.cities[cid].owner).filter(function (o) { return !SG.S.off[o].acted; });
@@ -164,7 +164,7 @@ SG.recruitChance = function (oid, target, fid) {
 };
 SG.join = function (target, fid, cid) {
   var t = SG.S.off[target];
-  t.s = 'force'; t.f = fid; t.c = cid; t.acted = true;
+  t.s = 'force'; t.f = fid; t.c = cid; t.acted = true; delete t.march;
   t.loy = SG.isKin(target, SG.S.forces[fid].lord) ? 100 : SG.randInt(65, 85);
   t.found = true;
 };
@@ -215,20 +215,17 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   soldiers = SG.clamp(Math.floor(soldiers || 0), 0, c.soldiers);
   gold = SG.clamp(Math.floor(gold || 0), 0, c.gold);
   food = SG.clamp(Math.floor(food || 0), 0, c.food);
-  if (soldiers > 0) {
-    d.train = Math.round((d.train * d.soldiers + c.train * soldiers) / (d.soldiers + soldiers));
-    d.morale = Math.round((d.morale * d.soldiers + c.morale * soldiers) / (d.soldiers + soldiers));
-  }
+  // 장수·병사·금·식량은 길을 가는 동안 어느 도시에도 없다가 다음 달에 도착한다 (SG.deliverMarches)
   var mix = SG.mixOf(cid, soldiers);
-  SG.takeTroops(c, mix, cid); SG.putTroops(d, mix, dest);
-  c.gold -= gold; d.gold += gold;
-  c.food -= food; d.food += food;
-  oids.forEach(function (o) { SG.S.off[o].c = dest; SG.S.off[o].acted = true; });
+  SG.takeTroops(c, mix, cid);
+  c.gold -= gold; c.food -= food;
+  oids.forEach(function (o) { SG.S.off[o].march = dest; SG.S.off[o].acted = true; });
+  (SG.S.marches = SG.S.marches || []).push({ from: cid, to: dest, fid: c.owner, oids: oids.slice(), mix: mix, n: soldiers, train: c.train, morale: c.morale, gold: gold, food: food });
   var extra = [];
   if (soldiers) extra.push('병사 ' + SG.fmt(soldiers));
   if (gold) extra.push('금 ' + SG.fmt(gold));
   if (food) extra.push('식량 ' + SG.fmt(food));
-  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 이동했다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '.';
+  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 떠났다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '. 다음 달에 도착한다.';
   if (SG.cmdLog) SG.cmdLog.push({ oid: oids[0], msg: SG.josa(msg), ok: true });
   return { ok: true, msg: msg };
 };
@@ -260,6 +257,40 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
     : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) 다음 달에 도착한다.' : '')
     : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + goods + '을(를) 실어 오게 했다. 다음 달에 도착한다.';
   return done(oid, msg, { moved: soldiers, src: src, dest: dest, convoy: (food || gold) ? { gold: gold, food: food } : null });
+};
+
+// ---- 행군 (이동한 장수·병사·물자가 길 위에 있는 동안)
+SG.marchesTo = function (cid) { return (SG.S.marches || []).filter(function (v) { return v.to === cid; }); };
+// 달이 바뀔 때 도착. 받을 도시를 잃었으면 떠난 도시로, 둘 다 잃었으면 가장 가까운 우리 도시로 (그것도 없으면 장수는 재야로, 병사는 흩어짐)
+SG.deliverMarches = function () {
+  var S = SG.S, list = S.marches || [];
+  S.marches = [];
+  list.forEach(function (v) {
+    var alive = S.forces[v.fid] && S.forces[v.fid].alive;
+    var dest = !alive ? null : S.cities[v.to].owner === v.fid ? v.to : S.cities[v.from].owner === v.fid ? v.from : SG.nearestOwn(v.fid, v.to);
+    var who = v.oids.filter(function (o) { var x = S.off[o]; return x && x.march && x.s === 'force' && x.f === v.fid; });
+    v.oids.forEach(function (o) { if (S.off[o]) delete S.off[o].march; });
+    if (!dest) {
+      who.forEach(function (o) { SG.makeFree(o, v.to); });
+      return;
+    }
+    var d = S.cities[dest];
+    if (v.n > 0) {
+      d.train = Math.round((d.train * d.soldiers + v.train * v.n) / (d.soldiers + v.n));
+      d.morale = Math.round((d.morale * d.soldiers + v.morale * v.n) / (d.soldiers + v.n));
+      SG.putTroops(d, v.mix, dest);
+    }
+    d.gold += v.gold; d.food += v.food;
+    who.forEach(function (o) { S.off[o].c = dest; });
+    if (SG.isPlayer && SG.isPlayer(v.fid)) {
+      var what = [v.n ? '병사 ' + SG.fmt(v.n) : '', v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join('·');
+      SG.log(v.fid, dest === v.to ? (who.map(SG.name).join(', ') || '부대') + '이(가) ' + SG.cityName(dest) + '에 도착했다' + (what ? ' (' + what + ')' : '') + '.'
+        : SG.cityName(v.to) + '을(를) 잃어 ' + (who.map(SG.name).join(', ') || '부대') + '이(가) ' + SG.cityName(dest) + '(으)로 갔다.', dest === v.to ? 'sys' : 'warn');
+      var a = (S.arrived = S.arrived || {})[dest] = S.arrived[dest] || {};
+      a.gold = (a.gold || 0) + v.gold; a.food = (a.food || 0) + v.food; a.soldiers = (a.soldiers || 0) + v.n;
+      a.offs = (a.offs || []).concat(who);
+    }
+  });
 };
 
 // ---- 수레 (금·식량이 길 위에 있는 동안)

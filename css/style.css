@@ -1408,3 +1408,19 @@ html.portrait .duel-acts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .field-scene::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(to top, rgba(12, 8, 4, .5), transparent 40%), radial-gradient(ellipse at 50% 45%, transparent 50%, rgba(12, 6, 2, .4) 100%); }
 /* 육각 전장: 그림 바탕 위 칸 테두리를 또렷하게 */
 .bt .hex.tex { stroke: rgba(40, 30, 16, .45); stroke-width: 1.2; }
+/* 타이틀 그림: 그림이 주인공. 왼쪽만 살짝 가려 글자가 읽히게, 이름난 장수 카드는 아래 오른쪽 작은 줄로 */
+.title2.painted .t-bg { inset: -3%; background-position: 60% 50%; background-size: cover; background-repeat: no-repeat; animation: drift 70s ease-in-out infinite alternate; }
+.title2.painted .t-fade { background: linear-gradient(90deg, color-mix(in srgb, var(--surface) 88%, transparent) 0%, color-mix(in srgb, var(--surface) 72%, transparent) 26%, color-mix(in srgb, var(--surface) 20%, transparent) 46%, transparent 60%), linear-gradient(to top, rgba(10, 6, 2, .35), transparent 30%); }
+.title2.painted .t-body { grid-template-columns: minmax(440px, 40%) 1fr; }
+.title2.painted .heroes { position: absolute; right: 28px; bottom: 22px; grid-template-columns: repeat(6, 74px); gap: 8px; justify-content: end; }
+.title2.painted .hero img { border-width: 2px; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); }
+.title2.painted .hero figcaption { left: 3px; right: 3px; bottom: 3px; padding: 2px 5px; }
+.title2.painted .hero figcaption b { font-size: 13px; }
+.title2.painted .hero figcaption span { display: none; }
+.title2.painted .hero:nth-child(3n+2) { transform: none; }
+html.compact .title2.painted .heroes { right: 12px; bottom: 10px; grid-template-columns: repeat(6, 46px); gap: 5px; }
+html.compact .title2.painted .hero figcaption { display: none; }
+html.portrait .title2.painted .heroes { display: none; }
+html.portrait .title2.painted .t-bg { inset: 0; background-position: 80% 30%; animation: none; }
+html.portrait .title2.painted .t-fade { background: linear-gradient(to bottom, transparent 0%, transparent 34%, color-mix(in srgb, var(--surface) 82%, transparent) 52%, color-mix(in srgb, var(--surface) 92%, transparent) 100%); }
+html.portrait .title2.painted .t-body { align-content: end; padding-bottom: 28px; }

@@ -33,8 +33,10 @@ SG.UI.title = function () {
       h('figcaption', null, [h('b', { text: o.n }), h('span', { text: x[1] })])
     ]);
   }));
-  app.appendChild(h('div', { class: 'title2' }, [
-    h('div', { class: 't-bg' }), h('div', { class: 't-fade' }),
+  // 타이틀 그림 두 장 중 하나 (Higgsfield)
+  var art = SG.UI.TITLE_ART[Math.floor(Math.random() * SG.UI.TITLE_ART.length)];
+  app.appendChild(h('div', { class: 'title2 painted' }, [
+    h('div', { class: 't-bg', style: { backgroundImage: 'url(' + art + ')' } }), h('div', { class: 't-fade' }),
     h('div', { class: 't-body' }, [
       h('div', { class: 't-left' }, [
         h('div', { class: 'eyebrow', text: '184 – 280 · 13주 44성 · 장수 ' + SG.OFFICER_LIST.length + '명 · 시나리오 ' + SG.SCENARIOS.length + '개' }),
@@ -49,6 +51,8 @@ SG.UI.title = function () {
   ]));
   SG.UI.music('title');
 };
+
+SG.UI.TITLE_ART = ['img/scene/title-a.jpg', 'img/scene/title-b.jpg'];
 
 // 시나리오 미니 지도: 지형 그림 위에 세력 색 점
 SG.UI.miniMap = function (sc) {

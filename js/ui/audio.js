@@ -217,99 +217,223 @@ SG.Audio = (function () {
     o.connect(lp); lp.connect(a); out(g, bus, a, 0.5); o.start(t); o.stop(t + dur + 0.3);
   };
 
-  // ---- 작곡 (마디 단위로 만들어 미리 예약)
-  // 5음계: 궁조(D: D E F# A B), 우조(E 단조 5음: E G A B D)
-  var GONG = [0, 2, 4, 7, 9], YU = [0, 3, 5, 7, 10];
+  // 편종: 맑게 울리고 길게 잦아드는 쇠북
+  A.bell = function (g, bus, t, midi, vel) {
+    var c = g.ctx, f = mtof(midi);
+    [[1, 1], [2.76, 0.45], [5.4, 0.22], [8.9, 0.1]].forEach(function (p, i) {
+      var o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f * p[0];
+      var a = c.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(vel * 0.16 * p[1], t + 0.005);
+      a.gain.exponentialRampToValueAtTime(0.0005, t + 2.6 - i * 0.5);
+      o.connect(a); out(g, bus, a, 0.5); o.start(t); o.stop(t + 2.7);
+    });
+  };
+  // 낮은 현 (받침음): 부드럽게 길게
+  A.bass = function (g, bus, t, midi, dur, vel) {
+    var c = g.ctx, o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = mtof(midi);
+    var lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+    var a = c.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(vel * 0.3, t + 0.12);
+    a.gain.setValueAtTime(vel * 0.26, t + Math.max(0.15, dur - 0.2)); a.gain.linearRampToValueAtTime(0, t + dur + 0.1);
+    o.connect(lp); lp.connect(a); out(g, bus, a, 0.15); o.start(t); o.stop(t + dur + 0.2);
+  };
+  // 비파 트레몰로: 같은 음을 잘게 빠르게 뜯기
+  A.tremolo = function (g, bus, t, midi, dur, vel) {
+    var step = 0.085, n = Math.max(2, Math.floor(dur / step));
+    for (var i = 0; i < n; i++) A.pluck(g, bus, t + i * step, midi, vel * (0.75 + 0.25 * Math.sin(i * 0.7)), { bright: true, dur: step * 1.2 });
+  };
+
+  // ---- 작곡: 곡을 「판」 단위로 짓는다. 한 판 = 도입·가·가'·나·다·가''·마무리 같은 여러 대목.
+  // 판이 바뀔 때마다 으뜸음·선법·빠르기·대목 순서·선율 동기(모티프)·악기가 새로 정해져서 같은 소리가 되풀이되지 않는다.
+  var MODES = { gong: [0, 2, 4, 7, 9], shang: [0, 2, 5, 7, 10], jue: [0, 3, 5, 8, 10], zhi: [0, 2, 5, 7, 9], yu: [0, 3, 5, 7, 10] };
+  var GONG = MODES.gong, YU = MODES.yu;
   function deg(root, scale, d) { // 음계 도수 → MIDI
     var o = Math.floor(d / 5), i = ((d % 5) + 5) % 5;
     return root + o * 12 + scale[i];
   }
-  var RHYTHMS = {
-    calm: [[2, 2], [3, 1], [1, 1, 2], [2, 1, 1], [4], [1.5, 0.5, 2]],
-    epic: [[1, 1, 1, 1], [1.5, 0.5, 1, 1], [0.5, 0.5, 1, 2], [2, 1, 1], [1, 1, 2], [0.75, 0.25, 1, 2]]
+  function pick(r, arr) { return arr[Math.floor(r() * arr.length)]; }
+  // 4마디 화음 진행 (5음계 도수). 마지막은 으뜸으로 돌아오거나 다음으로 이어진다
+  var PROGS = [[0, 3, 4, 0], [0, 2, 3, 1], [0, 0, 3, 4], [5, 3, 4, 0], [0, 4, 2, 3], [3, 4, 2, 0], [0, 1, 3, 4], [2, 3, 1, 0]];
+  var RHY = {
+    calm: [[2, 2], [3, 1], [1, 1, 2], [2, 1, 1], [1.5, 0.5, 2], [1, 0.5, 0.5, 2], [4], [0.5, 0.5, 1, 2]],
+    epic: [[1, 1, 1, 1], [1.5, 0.5, 1, 1], [0.5, 0.5, 1, 2], [2, 1, 1], [1, 1, 2], [0.75, 0.25, 1, 2], [0.5, 0.5, 0.5, 0.5, 2]]
   };
-  // 선율 한 마디: 지난 음에서 대체로 한두 칸씩 움직이고, 구절 끝은 으뜸음으로
-  function melodyBar(st, r, kind, cadence) {
-    var rh = RHYTHMS[kind][Math.floor(r() * RHYTHMS[kind].length)];
-    if (cadence) rh = kind === 'calm' ? [2, 2] : [1, 1, 2];
-    var notes = [], t = 0;
-    rh.forEach(function (d, i) {
-      var step = r() < 0.55 ? (r() < 0.5 ? 1 : -1) : (r() < 0.6 ? (r() < 0.5 ? 2 : -2) : 0);
-      st.d = Math.max(st.lo, Math.min(st.hi, st.d + step));
-      if (cadence && i === rh.length - 1) st.d = st.home;
-      notes.push({ t: t, d: d, deg: st.d });
-      t += d;
+  function makeMotif(r, kind) {
+    var m = { rh: [pick(r, RHY[kind]), pick(r, RHY[kind])], ct: [] };
+    var d = pick(r, [0, 2, 4]);
+    m.rh.forEach(function (rh) {
+      m.ct.push(rh.map(function () { var x = d; d += pick(r, [1, 1, -1, -1, 2, -2, 0, 3]); d = Math.max(-1, Math.min(6, d)); return x; }));
     });
-    return notes;
+    m.seq = pick(r, [1, 2, -1, 2]);
+    return m;
+  }
+  // 곡 한 판 짓기
+  function makeSong(tr, cycle) {
+    var r = rng(tr.seed * 7919 + cycle * 104729 + 17), st = tr.style;
+    var root = cycle === 0 ? st.roots[0] : pick(r, st.roots), mode = cycle === 0 ? st.modes[0] : pick(r, st.modes);
+    var bpm = Math.round(st.bpm * (cycle === 0 ? 1 : 0.94 + r() * 0.12));
+    var plan = st.form(r, cycle).map(function (sec) {
+      var sr = sec.shift ? root + sec.shift : root, sm = sec.mode ? MODES[sec.mode] : MODES[mode];
+      var p1 = pick(r, PROGS), p2 = pick(r, PROGS).slice(); p2[3] = 0;
+      return Object.assign({ root: sr, scale: sm, prog: p1.concat(p2), motif: makeMotif(r, st.kind), dyn: 0.9 }, sec);
+    });
+    return { bpm: bpm, plan: plan };
+  }
+  // 대목 순서 짓기 도우미: 후보에서 골라 섞는다
+  function lead(r, list) { return pick(r, list); }
+
+  // 반주 무늬 (화음 근음 도수 c, 도수 → 음높이 D(d, 옥타브))
+  var ACC = {
+    sparse: function (g, b, t, spb, c, D, v) { A.pluck(g, b, t, D(c, -1), 0.5 * v); A.pluck(g, b, t + 2 * spb, D(c + 2, -1), 0.3 * v); },
+    roll: function (g, b, t, spb, c, D, v) {
+      A.pluck(g, b, t, D(c, -1), 0.6 * v);
+      [0, 2, 4, 5].forEach(function (k, i) { A.pluck(g, b, t + i * 0.07, D(c + k, 0), 0.26 * v); });
+      [0, 2, 4].forEach(function (k, i) { A.pluck(g, b, t + 2 * spb + i * 0.07, D(c + k, 0), 0.2 * v); });
+    },
+    arp: function (g, b, t, spb, c, D, v) {
+      A.pluck(g, b, t, D(c, -1), 0.55 * v);
+      [0, 2, 4, 2, 3, 2, 4, 5].forEach(function (k, i) { A.pluck(g, b, t + i * spb * 0.5, D(c + k, 0), (i % 2 ? 0.15 : 0.23) * v); });
+    },
+    arp2: function (g, b, t, spb, c, D, v) {
+      A.pluck(g, b, t, D(c, -1), 0.55 * v);
+      [0, 1, 2, 3, 4, 3, 2, 1].forEach(function (k, i) { A.pluck(g, b, t + i * spb * 0.5, D(c + k, 0), (i % 2 ? 0.14 : 0.22) * v); });
+    },
+    pulse: function (g, b, t, spb, c, D, v) {
+      [0, 2].forEach(function (q) { A.pluck(g, b, t + q * spb, D(c, -1), 0.5 * v); });
+      [1, 3].forEach(function (q) { A.pluck(g, b, t + q * spb, D(c + 2, 0), 0.22 * v); A.pluck(g, b, t + q * spb + 0.02, D(c + 4, 0), 0.18 * v); });
+    },
+    tremolo: function (g, b, t, spb, c, D, v) { A.tremolo(g, b, t, D(c + 2, 0), spb * 1.9, 0.16 * v); A.tremolo(g, b, t + 2 * spb, D(c + 4, 0), spb * 1.9, 0.14 * v); A.pluck(g, b, t, D(c, -1), 0.5 * v); },
+    gallop: function (g, b, t, spb, c, D, v) { [0, 0, 2, 0, 0, 2, 3, 2].forEach(function (k, i) { A.pluck(g, b, t + i * spb * 0.5, D(c + k, -1), (i % 4 === 0 ? 0.3 : 0.18) * v, { dur: spb * 0.4 }); }); },
+    drone: function (g, b, t, spb, c, D, v) { A.bass(g, b, t, D(c, -1), spb * 3.8, 0.8 * v); }
+  };
+  // 장단 (타악)
+  var PERC = {
+    none: function () {},
+    wood: function (g, b, t, spb, k, v) { if (k % 2 === 0) A.woodblock(g, b, t, 0.16 * v); if (k % 4 === 3) A.woodblock(g, b, t + 3.5 * spb, 0.12 * v); },
+    hand: function (g, b, t, spb, k, v) { A.smallDrum(g, b, t + spb, 0.18 * v); A.smallDrum(g, b, t + 3 * spb, 0.2 * v); if (k % 4 === 3) A.smallDrum(g, b, t + 3.5 * spb, 0.15 * v); },
+    grand: function (g, b, t, spb, k, v) { A.bigDrum(g, b, t, 0.55 * v); if (k % 2 === 1) A.bigDrum(g, b, t + 2.5 * spb, 0.35 * v); },
+    march: function (g, b, t, spb, k, v) {
+      A.bigDrum(g, b, t, 0.8 * v); A.bigDrum(g, b, t + 1.5 * spb, 0.45 * v); A.bigDrum(g, b, t + 2 * spb, 0.7 * v);
+      if (k % 2 === 1) A.bigDrum(g, b, t + 3.5 * spb, 0.5 * v);
+      for (var i = 0; i < 8; i++) A.smallDrum(g, b, t + i * spb * 0.5, (i % 2 ? 0.22 : 0.36) * v);
+    },
+    gallop: function (g, b, t, spb, k, v) {
+      [0, 0.75, 1, 2, 2.75, 3].forEach(function (x, i) { A.bigDrum(g, b, t + x * spb, (i % 3 === 0 ? 0.75 : 0.42) * v); });
+      for (var i = 0; i < 4; i++) A.smallDrum(g, b, t + (i + 0.5) * spb, 0.25 * v);
+    },
+    roll: function (g, b, t, spb, k, v) {
+      A.bigDrum(g, b, t, 0.7 * v);
+      for (var i = 0; i < 16; i++) A.smallDrum(g, b, t + i * spb * 0.25, (0.12 + i * 0.022) * v);
+    },
+    brk: function (g, b, t, spb, k, v) { A.bigDrum(g, b, t, 0.75 * v); if (k % 2 === 1) A.bigDrum(g, b, t + 3 * spb, 0.5 * v); }
+  };
+  // 선율 한 마디: 동기(2마디)를 내놓고 → 받고 → 한 칸 옮겨 되풀이 → 마침. 뒷 4마디는 꾸밈을 더한다
+  function phraseBar(S, k, r, kind) {
+    var M = S.motif, p = k % 4, second = Math.floor(k / 4) % 2 === 1, last = k === S.bars - 1, rh, ct;
+    if (p === 3) {
+      rh = pick(r, kind === 'epic' ? [[1, 1, 2], [2, 2], [0.5, 0.5, 1, 2]] : [[2, 2], [3, 1], [1, 1, 2]]);
+      ct = rh.map(function (x, i) { return i === rh.length - 1 ? (last || second ? 0 : 2) : pick(r, [1, 2, 3, 4]); });
+    } else {
+      var src = p === 1 ? 1 : 0;
+      rh = M.rh[src].slice(); ct = M.ct[src].map(function (d) { return d + (p === 2 ? M.seq : 0); });
+      if (second && rh.length < 6) { // 긴 음 하나를 둘로 나눠 꾸민다
+        var li = rh.indexOf(Math.max.apply(null, rh));
+        if (rh[li] >= 1) { var h0 = rh[li] / 2; rh.splice(li, 1, h0, h0); ct.splice(li + 1, 0, ct[li] + pick(r, [1, -1])); }
+      }
+    }
+    var out = [], tt = 0;
+    rh.forEach(function (d, i) { out.push({ t: tt, d: d, deg: ct[i] }); tt += d; });
+    return out;
+  }
+  // 선율 악기
+  var LEAD = {
+    flute: function (g, b, t, m, dur, v, r) { if (dur > 0.5 && r() < 0.18) A.flute(g, b, t - 0.07, m + 2, 0.07, 0.45 * v); A.flute(g, b, t, m, dur * 0.94, 0.62 * v); },
+    xiao: function (g, b, t, m, dur, v) { A.flute(g, b, t, m - 12, dur * 0.96, 0.7 * v); },
+    zheng: function (g, b, t, m, dur, v, r) { A.pluck(g, b, t, m, 0.6 * v, { bright: true, bend: dur > 0.9 && r() < 0.5 }); },
+    erhu: function (g, b, t, m, dur, v, r, prev) { A.erhu(g, b, t, m, dur * 0.95, 0.85 * v, prev && Math.abs(prev - m) <= 4 && r() < 0.35 ? prev : null); },
+    pipa: function (g, b, t, m, dur, v) { if (dur >= 0.9) A.tremolo(g, b, t, m, dur * 0.95, 0.4 * v); else A.pluck(g, b, t, m, 0.55 * v, { bright: true }); },
+    horn: function (g, b, t, m, dur, v) { A.horn(g, b, t, m - 12, dur * 0.95, 0.6 * v); }
+  };
+  function playBar(g, bus, tr, S, k, t0, spb, r) {
+    var D = function (d, oct) { return deg(S.root + 12 * (oct || 0), S.scale, d); };
+    var c = S.prog[k % S.prog.length], v = S.dyn;
+    if (S.fadeOut) v *= 1 - 0.55 * k / S.bars;
+    if (S.fadeIn) v *= 0.55 + 0.45 * k / S.bars;
+    if (k === 0 && S.gong) A.gong(g, bus, t0, 0.7 * v, S.gong);
+    if (k === 0 && S.crash) A.cymbal(g, bus, t0, 0.7 * v);
+    if (S.bells && k % 2 === 0) [0, 2, 4].forEach(function (x, i) { A.bell(g, bus, t0 + i * spb * 0.66, D(c + x + 5, 0), 0.5 * v); });
+    if (S.drone) A.bass(g, bus, t0, D(c, -1), spb * 3.9, 0.7 * v);
+    ACC[S.acc](g, bus, t0, spb, c, D, v);
+    PERC[S.perc || 'none'](g, bus, t0, spb, k, v);
+    if (S.hornCall && k % 4 === 2) A.horn(g, bus, t0, D(c, 0), spb * 2.5, 0.65 * v);
+    if (!S.lead) return;
+    var prev = null, oct = S.oct === undefined ? 1 : S.oct;
+    phraseBar(S, k, r, tr.style.kind).forEach(function (n) {
+      var m = D(c + n.deg, oct);
+      LEAD[S.lead](g, bus, t0 + n.t * spb, m, n.d * spb, v, r, prev);
+      if (S.lead2) LEAD[S.lead2](g, bus, t0 + n.t * spb, m + (S.lead2 === 'xiao' ? 12 : 0), n.d * spb, 0.55 * v, r, prev);
+      prev = m;
+    });
+    // 맞선율: 긴 음으로 화음을 받쳐 준다
+    if (S.counter) A.erhu(g, bus, t0, D(c + 2, 0), spb * 3.8, 0.38 * v);
   }
 
   var TRACKS = {};
-  // 타이틀: 느리고 장엄하게 (징·큰북·고쟁 펼침화음·피리)
-  TRACKS.title = { bpm: 58, beats: 4, root: 50, scale: GONG, seed: 11,
-    bar: function (g, bus, t0, bi, spb, r, st) {
-      var roots = [0, 3, 4, 0, 2, 3, 1, 0], R = roots[bi % 8];
-      if (bi % 8 === 0) A.gong(g, bus, t0, 0.9, 82);
-      A.bigDrum(g, bus, t0, 0.55); if (bi % 2 === 1) A.bigDrum(g, bus, t0 + 2.5 * spb, 0.35);
-      A.pluck(g, bus, t0, deg(this.root - 12, this.scale, R), 0.7);
-      [0, 2, 4, 5, 7, 5, 4, 2].forEach(function (k, i) {
-        A.pluck(g, bus, t0 + i * spb * 0.5, deg(TRACKS.title.root, TRACKS.title.scale, R + k), 0.28 + (i === 0 ? 0.1 : 0));
-      });
-      if (bi % 8 >= 2) melodyBar(st, r, 'calm', bi % 4 === 3).forEach(function (n) {
-        A.flute(g, bus, t0 + n.t * spb, deg(TRACKS.title.root + 12, TRACKS.title.scale, n.deg), n.d * spb * 0.95, 0.75);
-      });
-    } };
-  // 전략 지도: 잔잔하게 (고쟁 반주 + 피리/고쟁 선율 번갈아)
-  TRACKS.map = { bpm: 74, beats: 4, root: 50, scale: GONG, seed: 23,
-    bar: function (g, bus, t0, bi, spb, r, st) {
-      var roots = [0, 0, 3, 4, 2, 3, 1, 0], R = roots[bi % 8], T = TRACKS.map;
-      A.pluck(g, bus, t0, deg(T.root - 12, T.scale, R), 0.6);
-      var pat = (bi % 16) < 8 ? [0, 4, 7, 4, 5, 4, 7, 9] : [0, 2, 4, 7, 4, 2, 5, 4];
-      pat.forEach(function (k, i) { A.pluck(g, bus, t0 + i * spb * 0.5, deg(T.root, T.scale, R + k), i % 2 ? 0.16 : 0.24); });
-      if (bi % 4 === 0) A.woodblock(g, bus, t0, 0.18);
-      var section = Math.floor(bi / 8) % 4; // 피리 → 고쟁 → 피리 → 쉼
-      var cad = bi % 4 === 3;
-      if (section === 3) return;
-      melodyBar(st, r, 'calm', cad).forEach(function (n) {
-        var m = deg(T.root + 12, T.scale, n.deg);
-        if (section === 1) A.pluck(g, bus, t0 + n.t * spb, m, 0.62, { bright: true, bend: n.d >= 2 && r() < 0.5 });
-        else A.flute(g, bus, t0 + n.t * spb, m, n.d * spb * 0.92, 0.6);
-      });
-    } };
-  // 전투: 빠르고 긴장감 있게 (북 장단 + 이호 선율 + 고쟁 빠른 반주)
-  TRACKS.battle = { bpm: 118, beats: 4, root: 52, scale: YU, seed: 37,
-    bar: function (g, bus, t0, bi, spb, r, st) {
-      var T = TRACKS.battle, roots = [0, 0, 3, 4, 0, 2, 3, 4], R = roots[bi % 8];
-      A.bigDrum(g, bus, t0, 0.8); A.bigDrum(g, bus, t0 + 1.5 * spb, 0.45); A.bigDrum(g, bus, t0 + 2 * spb, 0.7);
-      if (bi % 2 === 1) A.bigDrum(g, bus, t0 + 3.5 * spb, 0.5);
-      for (var i = 0; i < 8; i++) A.smallDrum(g, bus, t0 + i * spb * 0.5, i % 2 ? 0.25 : 0.4);
-      if (bi % 8 === 0) A.cymbal(g, bus, t0, 0.8);
-      if (bi % 16 === 0) A.gong(g, bus, t0, 0.6, 70);
-      for (var j = 0; j < 8; j++) A.pluck(g, bus, t0 + j * spb * 0.5, deg(T.root - 12, T.scale, R + (j % 2 ? 2 : 0)), 0.22, { dur: spb * 0.45 });
-      if ((bi % 16) < 2) return; // 북만 울리는 도입
-      var prev = null;
-      melodyBar(st, r, 'epic', bi % 4 === 3).forEach(function (n) {
-        var m = deg(T.root + 12, T.scale, n.deg);
-        A.erhu(g, bus, t0 + n.t * spb, m, n.d * spb * 0.93, 0.9, prev && Math.abs(prev - m) <= 3 && r() < 0.3 ? prev : null);
-        prev = m;
-      });
-      if (bi % 8 === 6) A.horn(g, bus, t0, deg(T.root, T.scale, 0), spb * 2.5, 0.7);
-    } };
+  // 타이틀: 느리고 장엄하게
+  TRACKS.title = { seed: 11, style: { kind: 'calm', bpm: 58, roots: [50, 48, 52, 45], modes: ['gong', 'zhi', 'yu'],
+    form: function (r) {
+      return [
+        { bars: 4, acc: 'roll', perc: 'grand', gong: 82, bells: true, drone: true },
+        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', drone: true },
+        { bars: 8, acc: lead(r, ['arp', 'tremolo']), perc: 'grand', lead: lead(r, ['erhu', 'xiao']), counter: true, gong: 70 },
+        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', lead2: 'zheng', bells: true },
+        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true }
+      ];
+    } } };
+  // 전략 지도: 잔잔하게, 판마다 다른 노래
+  TRACKS.map = { seed: 23, style: { kind: 'calm', bpm: 74, roots: [50, 52, 55, 57, 48], modes: ['gong', 'zhi', 'shang', 'yu'],
+    form: function (r) {
+      var f = [
+        { bars: 4, acc: 'roll', perc: 'none', bells: r() < 0.6, fadeIn: true },
+        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'wood', lead: lead(r, ['flute', 'zheng']) },
+        { bars: 8, acc: lead(r, ['arp', 'arp2', 'pulse']), perc: 'wood', lead: lead(r, ['zheng', 'flute', 'pipa']), counter: r() < 0.5 },
+        { bars: 8, acc: lead(r, ['pulse', 'tremolo']), perc: 'hand', lead: lead(r, ['erhu', 'xiao']), shift: lead(r, [5, 7, -5]) },
+        { bars: 8, acc: 'drone', perc: 'none', lead: lead(r, ['xiao', 'zheng']), mode: lead(r, ['yu', 'jue', 'shang']), oct: 1 },
+        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'hand', lead: 'flute', lead2: r() < 0.5 ? 'zheng' : null, counter: true },
+        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true }
+      ];
+      // 가운데 대목 순서를 섞는다
+      if (r() < 0.5) { var x = f[3]; f[3] = f[4]; f[4] = x; }
+      return f;
+    } } };
+  // 전투: 빠르고 긴장감 있게, 판마다 한 음씩 올라가며 고조
+  TRACKS.battle = { seed: 37, style: { kind: 'epic', bpm: 118, roots: [52, 50, 54, 55], modes: ['yu', 'shang', 'jue'],
+    form: function (r) {
+      return [
+        { bars: 2, acc: 'gallop', perc: 'roll', crash: true },
+        { bars: 8, acc: 'gallop', perc: lead(r, ['march', 'gallop']), lead: 'erhu', gong: 70 },
+        { bars: 8, acc: lead(r, ['gallop', 'pulse']), perc: 'gallop', lead: lead(r, ['flute', 'pipa']), oct: 1, hornCall: true, crash: true },
+        { bars: 4, acc: 'tremolo', perc: 'brk', lead: null, drone: true },
+        { bars: 8, acc: 'gallop', perc: 'march', lead: 'erhu', lead2: lead(r, ['flute', 'zheng']), shift: 2, crash: true },
+        { bars: 2, acc: 'gallop', perc: 'roll' }
+      ];
+    } } };
 
-  // 곡 예약: [from, to) 시간 구간의 마디들을 만든다
+  // 곡 예약: until 까지의 마디들을 미리 만든다 (판 → 대목 → 마디 순서로 나아간다)
   A.scheduleTrack = function (g, bus, tr, state, until) {
-    var spb = 60 / tr.bpm;
-    // 탭을 오래 내려 두면 타이머가 멈춘다: 밀린 마디를 한꺼번에 울리지 말고 지금부터 다시
-    if (state.next < g.ctx.currentTime - 0.3) state.next = g.ctx.currentTime + 0.1;
+    // 화면이 바빠 타이머가 늦게 오면 이미 지난 시각에 음을 예약하게 되어 소리가 안 난다: 지금부터 다시
+    if (state.next < g.ctx.currentTime + 0.05) state.next = g.ctx.currentTime + 0.12;
     while (state.next < until) {
-      var r = rng(tr.seed * 1000 + state.bar);
-      tr.bar(g, bus, state.next, state.bar, spb, r, state.mel);
-      state.next += spb * tr.beats;
+      var song = state.song, S = song.plan[state.si], spb = 60 / song.bpm;
+      playBar(g, bus, tr, S, state.k, state.next, spb, rng(tr.seed * 1000 + state.bar));
+      state.next += spb * 4;
       state.bar++;
+      if (++state.k >= S.bars) {
+        state.k = 0;
+        if (++state.si >= song.plan.length) { state.si = 0; state.cyc++; state.song = makeSong(tr, state.cyc); }
+      }
     }
   };
   A.newState = function (tr, t) {
-    var home = 0;
-    return { next: t, bar: 0, mel: { d: home + 2, lo: -2, hi: 7, home: home } };
+    return { next: t, bar: 0, k: 0, si: 0, cyc: 0, song: makeSong(tr, 0) };
   };
 
   A.play = function (name) {
@@ -324,11 +448,12 @@ SG.Audio = (function () {
     bus.connect(A.g.musicBus);
     A.curBus = bus;
     A.state = A.newState(tr, A.ctx.currentTime + 0.15);
+    // 3초 앞까지 미리 예약해 두어, 화면이 바빠 타이머가 늦어도 음악이 끊기지 않게 한다
     A.timer = setInterval(function () {
       if (!A.ctx || A.ctx.state !== 'running') return;
-      A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 1.2);
-    }, 250);
-    A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 1.2);
+      A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 3);
+    }, 300);
+    A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 3);
   };
   // 지킴이: 음악이 켜져 있어야 하는데 멈춰 있으면 다시 (브라우저가 소리를 잠갔다 풀었을 때, 탭을 다시 열었을 때)
   A.ensure = function () {

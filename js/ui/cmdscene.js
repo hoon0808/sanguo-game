@@ -47,7 +47,7 @@ SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drough
 SG.UI.SCENE_IMG = { field: 1, market: 1, wall: 1, village: 1, drill: 1, road: 1, night: 1 };
 // 처음 장면이 열릴 때 그림이 늦게 뜨지 않도록 미리 받아 둔다
 window.addEventListener('load', function () {
-  setTimeout(function () { Object.keys(SG.UI.SCENE_IMG).forEach(function (k) { (new Image()).src = 'img/scene/' + k + '.jpg'; }); }, 1500);
+  setTimeout(function () { Object.keys(SG.UI.SCENE_IMG).concat(['hall', 'audience']).forEach(function (k) { (new Image()).src = 'img/scene/' + k + '.jpg'; }); }, 1500);
 });
 SG.UI.sceneBackdrop = function (bg0, color) {
   var bg = SG.UI.DISASTER_BASE[bg0] || bg0;
@@ -275,7 +275,7 @@ SG.UI.cmdScene = function (o, r, rows, meta) {
   var bgEl;
   if (meta.bg === 'hall') {
     var curtain = h('div', { class: 'hall-curtain' }); curtain.style.setProperty('--host', F.color);
-    bgEl = h('div', { class: 'cs-hall' }, [h('div', { class: 'hall-wall' }, [h('i', { class: 'lattice' })]), curtain, h('div', { class: 'pillar l' }), h('div', { class: 'pillar r' }), h('div', { class: 'hall-floor' }), h('div', { class: 'hall-carpet' })]);
+    bgEl = h('div', { class: 'cs-hall' }, [h('div', { class: 'hall-bg', style: { backgroundImage: 'url(img/scene/hall.jpg)' } }), curtain]);
   } else bgEl = h('div', { class: 'cs-sky', html: SG.UI.sceneBackdrop(meta.bg, F.color) });
   var card = SG.UI.resultCard(o, r, rows);
   var stage = h('div', { class: 'cmd-scene bg-' + meta.bg }, [bgEl,

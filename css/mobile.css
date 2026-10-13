@@ -345,3 +345,17 @@ html.compact .cmdbox .cmd > .ico { width: 30px; height: 30px; padding: 6px; }
 html.compact .cmdbox .cmd-l { font-size: 12.5px; white-space: nowrap; }
 html.compact .cmdbox .cmd-h { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 html.compact .cmdbox .cmd-tab { min-height: 38px; padding: 5px 2px; font-size: 11px; }
+/* 일기토 (직접 겨루기): 통째로 줄이지 않고 그림만 작게, 단추는 손가락 크기 */
+html.compact .duel { zoom: 1; }
+html.compact .duel-box { padding: 10px 12px 12px; gap: 6px; max-height: 100dvh; overflow-y: auto; }
+html.compact .duel-title { font-size: 20px; }
+html.compact .duel-stage { gap: 8px; }
+html.compact .duel-f { padding: 6px; gap: 4px; }
+html.compact .duel-f img { width: 110px; height: 110px; }
+html.compact .duel-n b { font-size: 18px; }
+html.compact .duel-vs span { font-size: 36px; }
+html.compact .duel-line { font-size: 13px; min-height: 0; }
+html.compact .duel-chip { font-size: 13px; padding: 2px 8px; }
+html.compact .duel-pop { font-size: 28px; }
+@media (max-height: 420px) { html.compact .duel-f img { width: 76px; height: 76px; } html.compact .duel-n span { display: none; } }
+html.portrait .duel-f img { width: 120px; height: 120px; }

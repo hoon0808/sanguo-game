@@ -134,6 +134,97 @@ SG.duel = function (a, b) {
 };
 SG.DUEL_FATE = { killed: '목숨을 잃었다', captured: '사로잡혔다', fled: '도망쳤다' };
 
+// ---- 직접 겨루는 일기토: 합마다 두 장수가 수를 고른다 (가위바위보처럼 서로 이기고 진다)
+// 攻 공격: 기합을 끊는다 · 猛 강공: 공격을 누른다 · 守 방어: 강공을 막고 되친다 · 氣 기합: 기세를 모은다 · 必 필살(기세 60 이상): 무엇이든 뚫는다
+SG.DUEL_ACTS = {
+  atk: { n: '공격', h: '攻', desc: '빠른 일격. 기합을 끊고 들어간다. 방어에는 막힌다' },
+  power: { n: '강공', h: '猛', desc: '온 힘을 실은 일격. 공격을 누르지만 방어에 막히면 되치기를 당한다' },
+  guard: { n: '방어', h: '守', desc: '막아 낸다. 강공을 막으면 되친다. 기합에는 아무 일도 없다' },
+  focus: { n: '기합', h: '氣', desc: '숨을 고르고 기세를 크게 모은다. 공격에 끊기면 더 아프다' },
+  special: { n: '필살', h: '必', desc: '기세 60 이상. 모은 기세를 모두 써서 큰 일격. 방어도 뚫는다' },
+  retreat: { n: '물러나기', h: '退', desc: '말머리를 돌려 달아난다. 진 것이 되지만 잡히지는 않는다' }
+};
+SG.duelNew = function (a, b) {
+  return { f: [{ oid: a, hp: 100, sp: 10 }, { oid: b, hp: 100, sp: 10 }], round: 0, over: null };
+};
+SG.duelHit = function (D, i, mult) {
+  var me = SG.O(D.f[i].oid), op = SG.O(D.f[1 - i].oid);
+  var wa = me.war + (SG.hasSkill(D.f[i].oid, '무쌍') ? 8 : 0), wb = op.war + (SG.hasSkill(D.f[1 - i].oid, '무쌍') ? 8 : 0);
+  return Math.max(1, Math.round((10 + wa * 0.12) * (1 + (wa - wb) / 110) * mult * SG.randf(0.85, 1.15)));
+};
+// 한 합. acts = [i=0 의 수, i=1 의 수]. 돌려주는 것: {acts, dmg:[0이 받은 피해, 1이 받은 피해], text}
+SG.duelRound = function (D, acts) {
+  var F = D.f, dmg = [0, 0], gain = [8, 8], note = '';
+  D.round++;
+  acts = acts.map(function (x, i) { return x === 'special' && F[i].sp < 60 ? 'atk' : x; });
+  if (acts[0] === 'retreat' || acts[1] === 'retreat') {
+    var q = acts[0] === 'retreat' ? 0 : 1;
+    D.over = { winner: F[1 - q].oid, loser: F[q].oid, fate: 'fled' };
+    return { acts: acts, dmg: dmg, text: SG.name(F[q].oid) + '이(가) 말머리를 돌려 달아났다!' };
+  }
+  // i 가 j 에게 주는 피해 배수
+  function mult(i) {
+    var me = acts[i], op = acts[1 - i];
+    if (me === 'special') return op === 'guard' ? 1.4 : 2.2;
+    if (me === 'atk') return op === 'guard' ? 0.35 : op === 'focus' ? 1.25 : op === 'power' ? 0.55 : 1;
+    if (me === 'power') return op === 'guard' ? 0 : op === 'atk' ? 1.6 : op === 'focus' ? 1.6 : op === 'special' ? 0.6 : 1.4;
+    if (me === 'guard') return op === 'power' ? 0.9 : 0; // 되치기
+    return 0; // 기합
+  }
+  [0, 1].forEach(function (i) {
+    var m = mult(i);
+    if (m > 0) dmg[1 - i] = SG.duelHit(D, i, m);
+    if (acts[i] === 'focus') gain[i] = acts[1 - i] === 'atk' || acts[1 - i] === 'special' ? 15 : 40;
+    if (acts[i] === 'guard') gain[i] = 14;
+    if (acts[i] === 'special') F[i].sp = 0;
+  });
+  [0, 1].forEach(function (i) {
+    F[i].hp = Math.max(0, F[i].hp - dmg[i]);
+    F[i].sp = Math.min(100, F[i].sp + gain[i] + (dmg[i] ? 10 : 0));
+  });
+  // 장면 설명
+  var n0 = SG.name(F[0].oid), n1 = SG.name(F[1].oid), A0 = acts[0], A1 = acts[1];
+  function pair(x, y) { return (A0 === x && A1 === y) ? 0 : (A0 === y && A1 === x) ? 1 : -1; }
+  var w;
+  if ((w = pair('guard', 'power')) >= 0) note = [n0, n1][w] + '이(가) 강공을 받아 넘기고 되쳤다!';
+  else if ((w = pair('power', 'atk')) >= 0) note = [n0, n1][w] + '의 강공이 상대의 칼을 눌러 버렸다!';
+  else if ((w = pair('atk', 'focus')) >= 0) note = [n0, n1][w] + '이(가) 숨 고르는 틈을 파고들었다!';
+  else if (A0 === 'special' || A1 === 'special') note = (A0 === 'special' ? n0 : n1) + '의 필살 일격!';
+  else if (A0 === 'guard' && A1 === 'guard') note = '둘 다 칼을 거두고 서로를 노려본다.';
+  else if (A0 === 'focus' && A1 === 'focus') note = '두 장수가 기세를 끌어올린다…';
+  else if ((w = pair('guard', 'atk')) >= 0) note = [n0, n1][w] + '이(가) 일격을 막아 냈다.';
+  else if ((w = pair('focus', 'guard')) >= 0) note = [n0, n1][w] + '이(가) 틈을 타 기세를 모았다.';
+  else note = '칼과 칼이 맞부딪친다!';
+  // 끝
+  if (F[0].hp <= 0 || F[1].hp <= 0) {
+    var l = F[0].hp <= 0 && F[1].hp <= 0 ? (F[0].hp - dmg[0] < F[1].hp - dmg[1] ? 0 : 1) : (F[0].hp <= 0 ? 0 : 1);
+    var r = SG.rand(), margin = dmg[l];
+    var fate = r < (margin > 30 ? 0.12 : 0.05) ? 'killed' : (r < 0.4 ? 'captured' : 'fled');
+    D.over = { winner: F[1 - l].oid, loser: F[l].oid, fate: fate };
+  } else if (D.round >= 15) {
+    D.over = { draw: true };
+    note += ' 날이 저물어 두 장수가 물러났다.';
+  }
+  return { acts: acts, dmg: dmg, text: note };
+};
+// 컴퓨터의 수: 무력이 높을수록 덤비고, 상대 기세가 차면 막고, 제 기세가 차면 필살
+SG.duelAI = function (D, i) {
+  var me = D.f[i], op = D.f[1 - i], r = SG.rand();
+  if (me.sp >= 60 && r < 0.65) return 'special';
+  if (op.sp >= 60 && r < 0.5) return 'guard';
+  if (me.hp < 18 && op.hp > 50 && r < 0.25) return 'retreat';
+  var w = [['atk', 34], ['power', 24], ['guard', 20], ['focus', 18 + (me.sp < 30 ? 8 : 0)]];
+  var tot = w.reduce(function (s, x) { return s + x[1]; }, 0), p = SG.rand() * tot;
+  for (var k = 0; k < w.length; k++) { p -= w[k][1]; if (p <= 0) return w[k][0]; }
+  return 'atk';
+};
+// 둘 다 컴퓨터일 때 끝까지
+SG.duelAuto = function (a, b) {
+  var D = SG.duelNew(a, b);
+  while (!D.over) SG.duelRound(D, [SG.duelAI(D, 0), SG.duelAI(D, 1)]);
+  return D.over.draw ? SG.duel(a, b) : D.over;
+};
+
 // ---- 자동 전투 계산
 SG.autoBattle = function (atk, def) {
   var log = [], t = SG.S.cities[def.city], wallMax = SG.CITY_SIZE[SG.CITIES[def.city].size].wallMax;

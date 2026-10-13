@@ -1370,3 +1370,36 @@ html.compact .bf-desc { font-size: 11px; }
 .cmdbox .cmd > .ico { width: 34px; height: 34px; padding: 7px; }
 .cmdbox .cmd-l { font-size: 14px; white-space: nowrap; }
 .cmdbox .cmd-h { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 직접 겨루는 일기토 */
+.duel-box.live { gap: 10px; }
+.duel-imgw { position: relative; }
+.duel-chip { position: absolute; left: 50%; top: 8px; transform: translate(-50%, -6px) scale(.8); opacity: 0; padding: 4px 12px; border-radius: 14px; background: rgba(20, 12, 6, .82); color: #f6dfa0; font-family: var(--f-display); font-size: 18px; white-space: nowrap; box-shadow: 0 0 0 1px #d8b765; transition: opacity .2s, transform .25s cubic-bezier(.2, 1.4, .4, 1); }
+.duel-chip.on { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.duel-chip.a-special { background: #8e2c22; color: #fff; box-shadow: 0 0 0 2px #f6dfa0, 0 0 18px rgba(255, 120, 60, .7); }
+.duel-pop { position: absolute; left: 50%; top: 45%; transform: translate(-50%, 0); font-family: var(--f-display); font-size: 40px; color: #ff5a3c; text-shadow: 0 2px 0 #3a0c06, 0 0 10px rgba(0, 0, 0, .6); opacity: 0; pointer-events: none; }
+.duel-pop.on { animation: duelPop .9s ease-out forwards; }
+@keyframes duelPop { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -40px) scale(1); } }
+.duel-sp { position: relative; width: 100%; height: 7px; background: var(--surface-2); border-radius: 4px; overflow: visible; }
+.duel-sp i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #d8b765, #f39478); transition: width .35s; }
+.duel-sp small { position: absolute; right: 0; top: 8px; font-size: 10px; color: var(--muted); }
+.duel-f.r .duel-sp i { margin-left: auto; }
+.duel-f.charged { box-shadow: 0 0 0 2px #f39478, 0 0 22px rgba(243, 148, 120, .55); }
+.duel-acts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 640px; margin-top: 4px; }
+.duel-act { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border: 1px solid rgba(176, 138, 62, .6); border-radius: 5px; background: linear-gradient(180deg, var(--surface), var(--surface-2)); color: var(--ink); cursor: pointer; font-family: inherit; font-size: 13px; transition: transform .1s, box-shadow .1s; }
+.duel-act i { font-style: normal; font-family: var(--f-display); font-size: 22px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f0d690, #a77d2e 72%); color: #2a170c; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--brz); }
+.duel-act.a-power i, .duel-act.a-special i { background: radial-gradient(circle at 35% 30%, #f39478, #a8321f 72%); color: #fff4ea; }
+.duel-act.a-guard i { background: radial-gradient(circle at 35% 30%, #9cc7d8, #2c5f7a 72%); color: #fff; }
+.duel-act.a-retreat i { background: radial-gradient(circle at 35% 30%, #c8c0b0, #6a6258 72%); color: #fff; }
+.duel-act:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0, 0, 0, .2); }
+.duel-act:disabled { opacity: .4; cursor: default; }
+.duel-legend { font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.5; }
+html.compact .duel-acts { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+html.compact .duel-act { font-size: 11px; padding: 5px 1px; }
+html.compact .duel-act i { width: 30px; height: 30px; font-size: 17px; }
+html.compact .duel-legend { display: none; }
+html.portrait .duel-acts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.duel-acts.end { display: flex; justify-content: center; }
+/* 대전 그림 배경 (알현·포상·외교 장면) */
+.hall-bg { position: absolute; inset: 0; background: #2b1a10 center 40% / cover no-repeat; animation: csPan 20s ease-out both; transform-origin: 50% 45%; }
+.hall-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(12, 6, 2, .5) 100%), linear-gradient(to top, rgba(12, 8, 4, .55), transparent 40%); }
+.hall .hall-curtain, .cs-hall .hall-curtain { height: 30px; background-size: 90px 30px; opacity: .85; }

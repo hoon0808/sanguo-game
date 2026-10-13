@@ -43,10 +43,9 @@ SG.UI.audience = function (opt) {
   var curtain = h('div', { class: 'hall-curtain' });
   curtain.style.setProperty('--host', host ? host.color : '#7d1f17');
   var stage = h('div', { class: 'hall' + (opt.kind ? ' k-' + opt.kind : '') }, [
-    h('div', { class: 'hall-wall' }, [h('i', { class: 'lattice' })]),
+    // 대전 그림 (Higgsfield) 위에 손님 세력 빛깔의 휘장 끝단만 살짝
+    h('div', { class: 'hall-bg', style: { backgroundImage: 'url(img/scene/audience.jpg)' } }),
     curtain,
-    h('div', { class: 'pillar l' }), h('div', { class: 'pillar r' }),
-    h('div', { class: 'hall-floor' }), h('div', { class: 'hall-carpet' }),
     opt.extra || null,
     !opt.noHost && host && lord && lord !== opt.visitor ? h('div', { class: 'host' }, [h('div', { class: 'throne' }), SG.UI.portrait(lord, 104, P), h('span', { text: SG.name(lord) })]) : null,
     h('div', { class: 'visitor' }, [

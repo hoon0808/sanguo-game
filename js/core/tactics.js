@@ -339,14 +339,19 @@ SG.T.duelAccept = function (B, challenger, target) {
   var p = SG.duelWinChance(target.oid, challenger.oid);
   return p > 0.4 || SG.chance(0.25);
 };
-SG.T.duel = function (B, a, d, accepted) {
+// pre: 화면에서 직접 겨룬 결과 ({winner, loser, fate} 또는 {draw:true}). 없으면 바로 계산
+SG.T.duel = function (B, a, d, accepted, pre) {
   a.done = true;
   if (!accepted) {
     B.log.push(d.name + '이(가) ' + a.name + '의 일기토 신청을 피했다. 병사들의 사기가 떨어진다.');
     SG.T.moraleShift(B, a.side, 6);
     return { refused: true };
   }
-  var r = SG.duel(a.oid, d.oid);
+  if (pre && pre.draw) {
+    B.log.push('일기토! ' + a.name + ' 대 ' + d.name + ' — 승부가 나지 않아 두 장수가 물러났다.');
+    return pre;
+  }
+  var r = pre || SG.duel(a.oid, d.oid);
   var lu = r.loser === a.oid ? a : d, wu = lu === a ? d : a;
   B.log.push('일기토! ' + a.name + ' 대 ' + d.name + ' → ' + SG.name(r.winner) + ' 승리. ' + SG.name(r.loser) + '은(는) ' + SG.DUEL_FATE[r.fate] + '.');
   SG.T.moraleShift(B, wu.side, 12);

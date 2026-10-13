@@ -471,8 +471,8 @@ SG.UI.tactical = function (atk, def) {
         }
         if (st.mode === 'duel' && x && SG.T.duelTargets(B, u).indexOf(x) >= 0) {
           var acc = SG.T.duelAccept(B, u, x);
-          var res = SG.T.duel(B, u, x, acc);
-          await showDuel(u, x, res, acc);
+          if (acc) SG.T.duel(B, u, x, true, await playDuel(u, x));
+          else await showDuel(u, x, SG.T.duel(B, u, x, false), false);
           return afterAct();
         }
       }
@@ -502,6 +502,87 @@ SG.UI.tactical = function (atk, def) {
     }
 
     // ---- 일기토 연출: 몇 합을 주고받은 뒤 결과
+    // ---- 직접 겨루는 일기토: 합마다 수를 고른다. mine = 우리 장수(왼쪽), foe = 적 장수. 끝나면 {winner, loser, fate} 또는 {draw}
+    function playDuel(mine, foe) {
+      return new Promise(function (done) {
+        var D = SG.duelNew(mine.oid, foe.oid), busy = false;
+        var ov = h('div', { class: 'duel' });
+        function fighter(u, key) {
+          var hp = h('i'), sp = h('i'), chip = h('div', { class: 'duel-chip' }), pop = h('div', { class: 'duel-pop' });
+          var el = h('div', { class: 'duel-f ' + key, style: { borderColor: fcol[u.side] } }, [
+            h('div', { class: 'duel-imgw' }, [h('img', { alt: u.name, src: SG.UI.portraitSrc(u.oid) }), chip, pop]),
+            h('div', { class: 'duel-n' }, [h('b', { text: u.name }), h('span', { text: fname[u.side] + ' · 무력 ' + u.war + (u.sk ? ' · ' + u.sk : '') })]),
+            h('div', { class: 'duel-hp' }, [hp]), h('div', { class: 'duel-sp' }, [sp, h('small', { text: '기세' })])
+          ]);
+          el._hp = hp; el._sp = sp; el._chip = chip; el._pop = pop;
+          return el;
+        }
+        var fa = fighter(mine, 'l'), fd = fighter(foe, 'r');
+        var line = h('div', { class: 'duel-line', text: mine.name + '와(과) ' + foe.name + '이(가) 진 앞으로 나섰다! 수를 고르십시오.' });
+        var round = h('div', { class: 'duel-round', text: '1합' });
+        var acts = h('div', { class: 'duel-acts' });
+        var legend = h('div', { class: 'duel-legend', text: '攻 공격은 氣 기합을 끊고 · 猛 강공은 攻 공격을 누르고 · 守 방어는 猛 강공을 막아 되친다 · 必 필살(기세 60)은 다 뚫는다' });
+        var box = h('div', { class: 'duel-box live' }, [h('div', { class: 'duel-title', text: '일기토' }),
+          h('div', { class: 'duel-stage' }, [fa, h('div', { class: 'duel-vs' }, [round, h('span', { text: '對' })]), fd]), line, acts, legend]);
+        ov.appendChild(box);
+        root.appendChild(ov);
+        SG.UI.sfx('duel');
+        function upd() {
+          fa._hp.style.width = D.f[0].hp + '%'; fd._hp.style.width = D.f[1].hp + '%';
+          fa._sp.style.width = D.f[0].sp + '%'; fd._sp.style.width = D.f[1].sp + '%';
+          fa.classList.toggle('charged', D.f[0].sp >= 60); fd.classList.toggle('charged', D.f[1].sp >= 60);
+        }
+        function drawActs() {
+          acts.innerHTML = '';
+          ['atk', 'power', 'guard', 'focus', 'special', 'retreat'].forEach(function (k) {
+            var A0 = SG.DUEL_ACTS[k], off = k === 'special' && D.f[0].sp < 60;
+            acts.appendChild(h('button', { type: 'button', class: 'duel-act a-' + k, title: A0.desc, disabled: off || busy || null, onclick: function () { choose(k); } },
+              [h('i', { text: A0.h }), h('span', { text: A0.n })]));
+          });
+        }
+        function showChip(el, k) {
+          el._chip.textContent = SG.DUEL_ACTS[k].h + ' ' + SG.DUEL_ACTS[k].n;
+          el._chip.className = 'duel-chip on a-' + k;
+        }
+        function popDmg(el, n) {
+          if (!n) return;
+          el._pop.textContent = '-' + n; el._pop.className = 'duel-pop'; void el._pop.offsetWidth; el._pop.className = 'duel-pop on';
+          el.classList.remove('struck'); void el.offsetWidth; el.classList.add('struck');
+        }
+        function choose(k) {
+          if (busy || D.over) return;
+          busy = true; drawActs();
+          var ai = SG.duelAI(D, 1), res = SG.duelRound(D, [k, ai]);
+          showChip(fa, res.acts[0]); showChip(fd, res.acts[1]);
+          box.classList.remove('clash'); void box.offsetWidth; if (res.dmg[0] || res.dmg[1]) box.classList.add('clash');
+          SG.UI.sfx(res.acts.indexOf('special') >= 0 ? 'broken' : res.dmg[0] || res.dmg[1] ? 'clash' : 'click');
+          setTimeout(function () {
+            popDmg(fa, res.dmg[0]); popDmg(fd, res.dmg[1]); upd();
+            line.textContent = SG.josa(res.text);
+            if (D.over) return finishDuel();
+            round.textContent = (D.round + 1) + '합';
+            if (D.f[1].sp >= 60) line.textContent += ' — ' + SG.josa(foe.name + '의 기세가 차올랐다! 필살을 조심하라.');
+            busy = false; drawActs();
+          }, 420);
+        }
+        function finishDuel() {
+          var R = D.over;
+          acts.innerHTML = ''; acts.classList.add('end'); legend.remove();
+          round.textContent = '';
+          line.innerHTML = '';
+          if (R.draw) line.appendChild(h('b', { text: '무승부 — 승부가 나지 않았다' }));
+          else {
+            var meWon = R.winner === mine.oid;
+            (meWon ? fd : fa).classList.add('lost'); (meWon ? fa : fd).classList.add('won');
+            line.appendChild(h('b', { text: SG.name(R.winner) + ' 승리!' }));
+            line.appendChild(document.createTextNode(' ' + SG.josa(SG.name(R.loser) + '은(는) ' + SG.DUEL_FATE[R.fate] + '.')));
+            SG.UI.sfx(meWon ? 'win' : 'lose');
+          }
+          acts.appendChild(h('button', { class: 'btn primary', type: 'button', text: '확인', onclick: function () { ov.remove(); done(R); } }));
+        }
+        upd(); drawActs();
+      });
+    }
     function showDuel(a, d, res, accepted) {
       return new Promise(function (done) {
         var ov = h('div', { class: 'duel' });
@@ -598,8 +679,11 @@ SG.UI.tactical = function (atk, def) {
               if (e.ask && !st.auto) {
                 acc = await SG.UI.confirm('일기토 신청', u.name + '(무력 ' + u.war + ')이(가) ' + e.t.name + '(무력 ' + e.t.war + ')에게 일기토를 신청했습니다!\n받아들일까요? (피하면 사기가 떨어집니다)', '받아들인다', '피한다');
               } else if (e.ask) acc = SG.T.duelAccept(B, u, e.t);
-              if (e.ask) e.res = SG.T.duel(B, u, e.t, acc);
-              if (!st.auto || !e.ask) await showDuel(u, e.t, e.res, e.res && !e.res.refused);
+              if (e.ask && !st.auto && acc) e.res = SG.T.duel(B, u, e.t, true, await playDuel(e.t, u)); // 우리 장수가 직접 겨룬다
+              else {
+                if (e.ask) e.res = SG.T.duel(B, u, e.t, acc);
+                if (!st.auto || !e.ask) await showDuel(u, e.t, e.res, e.res && !e.res.refused);
+              }
             }
           }
           u.done = true;

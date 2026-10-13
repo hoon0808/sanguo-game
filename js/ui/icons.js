@@ -25,6 +25,7 @@ SG.ICONS = {
   recruit: 'M3 12l4-4 4 3 3-3 7 6-4 4-5-4M7 8l5 5M8 16l2 2M11 15l2 2',
   reward: 'M4 10h16v4H4zM5 14h14v7H5zM12 10v11M12 10c-2 0-5-1-5-3.5S10 5 12 10zM12 10c2 0 5-1 5-3.5S14 5 12 10z',
   move: 'M4 12h14M14 7l5 5-5 5M4 5h6M4 19h6',
+  trade: 'M12 3v17M7 20h10M4 7h16M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z',
   transport: 'M2 14h12V6H2zM14 9h4l3 3.5V14h-7M6 19a2 2 0 1 0 0-4a2 2 0 1 0 0 4zM17 19a2 2 0 1 0 0-4a2 2 0 1 0 0 4z',
   // 계략·외교
   rumor: 'M4 5h16v10H9l-5 4zM8 9h8M8 12h5',

@@ -413,10 +413,13 @@ SG.UI.soundSettings = function () {
 
 window.addEventListener('DOMContentLoaded', function () {
   // 브라우저는 사용자가 한 번 누른 뒤에야 소리를 낼 수 있다
-  document.addEventListener('pointerdown', function () {
-    if (!SG.Audio || !SG.Audio.init()) return;
-    if (SG.Audio.settings.music && SG.Audio.want && SG.Audio.trackName !== SG.Audio.want) SG.Audio.play(SG.Audio.want);
-  }, true);
+  // pointerdown·click·keydown 어느 것이든 처음 누를 때 소리를 켠다 (터치 노트북·펜은 pointerdown 만으로는 허락이 안 남)
+  ['pointerdown', 'click', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      if (!SG.Audio || !SG.Audio.init()) return;
+      SG.Audio.ensure();
+    }, true);
+  });
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('.btn, .dd-item, .scen-card, .lord-item, tr.click');
     if (b && !b.disabled) SG.UI.sfx('click');

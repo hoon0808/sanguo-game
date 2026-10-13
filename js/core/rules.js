@@ -231,6 +231,42 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   return done(oid, msg, { moved: soldiers, src: src, dest: dest });
 };
 
+// ---- 교역: 시장에서 식량을 사고판다. 값(식량 100당 금)은 철·상업·이달 시세·맡은 장수의 정치에 따라 달라진다
+SG.tradeRates = function (cid, oid) {
+  var S = SG.S, c = S.cities[cid], z = SG.CITY_SIZE[SG.CITIES[cid].size];
+  var since = (S.month - SG.HARVEST_MONTH + 12) % 12;          // 0 = 수확한 달
+  var season = 0.8 + 0.4 * since / 11;                         // 수확 직후 쌈 → 수확 전 비쌈
+  var key = (S.year * 12 + S.month) + ':' + cid, hsh = 0;
+  for (var i = 0; i < key.length; i++) hsh = (hsh * 31 + key.charCodeAt(i)) % 100003;
+  var market = 0.9 + (hsh % 21) / 100;                        // 이달 시세 ±10% (한 달 동안 같음)
+  var cr = SG.clamp(c.comm / z.commMax, 0, 1);                 // 상업이 클수록 사고팔 때 덜 손해
+  var skill = oid ? SG.clamp((SG.O(oid).pol - 50) / 1000, -0.03, 0.05) : 0;
+  var base = 16 * season * market;
+  return {
+    buy: Math.round(base * (1.25 - 0.15 * cr - skill) * 10) / 10,   // 식량 100 을 살 때 내는 금
+    sell: Math.round(base * (0.8 + 0.15 * cr + skill) * 10) / 10,   // 식량 100 을 팔 때 받는 금
+    max: Math.floor((3000 + c.comm * 15) / 100) * 100,              // 한 번에 거래할 수 있는 식량
+    since: since, market: market
+  };
+};
+SG.cmd.trade = function (cid, oid, mode, food) {
+  var c = SG.S.cities[cid];
+  if (!SG.ready(cid, oid)) return fail('명령할 수 없는 장수입니다');
+  var R = SG.tradeRates(cid, oid);
+  food = Math.floor(SG.clamp(food || 0, 0, R.max) / 100) * 100;
+  if (food <= 0) return fail('거래할 식량을 정하세요');
+  if (mode === 'buy') {
+    var cost = Math.ceil(food / 100 * R.buy);
+    if (c.gold < cost) return fail('금이 부족합니다 (필요 ' + cost + ')');
+    c.gold -= cost; c.food += food;
+    return done(oid, SG.name(oid) + '이(가) 시장에서 식량 ' + SG.fmt(food) + '을(를) 금 ' + SG.fmt(cost) + '에 사들였다.', { food: food, gold: -cost });
+  }
+  if (c.food < food) return fail('식량이 부족합니다');
+  var gain = Math.floor(food / 100 * R.sell);
+  c.food -= food; c.gold += gain;
+  return done(oid, SG.name(oid) + '이(가) 시장에 식량 ' + SG.fmt(food) + '을(를) 팔아 금 ' + SG.fmt(gain) + '을(를) 벌었다.', { food: -food, gold: gain });
+};
+
 // ---- 주인 없는 도시 차지 (전투 없이)
 SG.occupy = function (cid, oids, dest, soldiers, food) {
   var c = SG.S.cities[cid], d = SG.S.cities[dest];

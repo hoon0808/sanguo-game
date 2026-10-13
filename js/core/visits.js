@@ -46,7 +46,8 @@ SG.runVisits = async function () {
     var price = sell ? Math.round(amt * SG.randf(0.2, 0.3) / 10) * 10 : Math.round(amt * SG.randf(0.12, 0.18) / 10) * 10;
     var can = sell ? c.gold >= price : c.food >= amt * 2;
     if (can) {
-      var yes = await SG.visit({ figure: 'merchant', name: '떠돌이 상인', sub: '서역에서 온 장사꾼', kind: 'merchant', title: '상인 방문',
+      var who = SG.chance(0.5) ? { figure: 'merchant', name: '떠돌이 상인', sub: '서역에서 온 장사꾼' } : { figure: 'merchant2', name: '곡물 상인', sub: '곡식을 사고파는 거상' };
+      var yes = await SG.visit({ figure: who.figure, name: who.name, sub: who.sub, kind: 'merchant', title: '상인 방문',
         text: sell ? '나리, 좋은 곡식을 싣고 왔습니다요. 식량 ' + SG.fmt(amt) + '을 금 ' + SG.fmt(price) + '에 넘겨 드리겠습니다.\n이만한 값은 다시 없을 겁니다요.'
           : '나리, 창고에 곡식이 넉넉하시다고 들었습니다요. 식량 ' + SG.fmt(amt) + '을 금 ' + SG.fmt(price) + '에 사 가고 싶습니다만.',
         note: SG.cityName(cap) + ' · 금 ' + SG.fmt(c.gold) + ' · 식량 ' + SG.fmt(c.food),

@@ -12,6 +12,7 @@ SG.UI.CITY_FIELDS = [['gold', '금'], ['food', '식량'], ['soldiers', '병사']
 SG.UI.CMD_SCENES = {
   agri: { bg: 'field', lines: ['논밭을 넓히고 물길을 정비하겠습니다. 올가을엔 곳간이 넘칠 것입니다.', '백성들과 함께 황무지를 일구겠습니다!'], sfx: 'harvest' },
   comm: { bg: 'market', lines: ['시장을 열고 먼 곳의 상인들까지 불러 모으겠습니다.', '길을 닦고 세금을 가볍게 하면 장사꾼이 모여듭니다.'], sfx: 'coin' },
+  trade: { bg: 'market', lines: ['좋은 값에 거래하고 오겠습니다. 장사꾼들과 흥정이라면 자신 있습니다.', '저울을 속이는 자는 없는지 잘 살피며 사고팔겠습니다.'], sfx: 'coin' },
   wall: { bg: 'wall', lines: ['무너진 곳을 메우고 성벽을 한 자 더 높이겠습니다.', '돌을 나르고 흙을 다져라! 적이 넘보지 못하게!'], sfx: 'drum' },
   relief: { bg: 'village', lines: ['곳간을 열어 굶주린 백성부터 돌보겠습니다.', '백성이 편안해야 나라가 섭니다. 다녀오겠습니다.'], sfx: 'harvest' },
   conscript: { bg: 'drill', lines: ['용감한 젊은이들을 모아 오겠습니다!', '나라를 지킬 장정들이여, 깃발 아래로 모여라!'], sfx: 'drum' },
@@ -38,7 +39,7 @@ Object.assign(SG.UI.CMD_SCENES, {
   riot: { bg: 'riot', lines: ['백성들이 횃불을 들고 관아로 몰려왔습니다! 민심을 돌보지 않으면 또 일어날 것입니다.'], sfx: 'fire' }
 });
 SG.UI.CMD_TITLE = { locust: '메뚜기 떼', plague: '역병', flood: '홍수', drought: '가뭄', quake: '지진', bumper: '풍년', riot: '반란', attack: '출진', agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수', relief: '민심 안정', conscript: '징병', train: '훈련', search: '인재 탐색', recruit: '등용', reward: '포상',
-  move: '이동', transport: '수송', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고' };
+  move: '이동', transport: '수송', trade: '교역', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고' };
 
 // ---- 배경 그림
 SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drought: 'field', plague: 'village', riot: 'village', quake: 'wall' };

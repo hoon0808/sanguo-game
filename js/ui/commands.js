@@ -7,7 +7,8 @@ SG.UI.CMD_GROUPS = [
     { label: '농업 개발', run: function (cid) { return SG.UI.cmdDevelop(cid, 'agri'); } },
     { label: '상업 개발', run: function (cid) { return SG.UI.cmdDevelop(cid, 'comm'); } },
     { label: '성벽 보수', run: function (cid) { return SG.UI.cmdDevelop(cid, 'wall'); } },
-    { label: '민심 안정', run: function (cid) { return SG.UI.cmdRelief(cid); } }
+    { label: '민심 안정', run: function (cid) { return SG.UI.cmdRelief(cid); } },
+    { label: '교역', run: function (cid) { return SG.UI.cmdTrade(cid); } }
   ] },
   { name: '군사', items: [
     { label: '징병', run: function (cid) { return SG.UI.cmdConscript(cid); } },
@@ -25,7 +26,7 @@ SG.UI.CMD_GROUPS = [
 
 // 명령 아이콘·도움말
 SG.UI.CMD_META = {
-  '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'],
+  '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'], '교역': ['trade', '금 ↔ 식량'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
   '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금 100'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
@@ -181,6 +182,44 @@ SG.UI.cmdConscript = async function (cid) {
     [{ label: '모집', cls: 'n', get: function (o) { var n = SG.conscriptAmount(cid, o), cost = SG.conscriptCost(n, type); if (c.gold < cost) n = Math.floor(c.gold * 20 / SG.TROOPS[type].cost / 100) * 100; return SG.TROOPS[type].h + ' ' + SG.fmt(n) + ' · 금 ' + SG.conscriptCost(n, type); } }],
     '보유 금 ' + SG.fmt(c.gold) + ' · 매력이 높을수록 많이 모입니다 · 민심이 조금 내려갑니다', null, top);
   if (oid) await SG.UI.doCmd({ kind: 'conscript', cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.conscript(cid, oid, null, type); } });
+};
+// 교역: 시장에서 식량을 사고판다. 값은 철·상업·이달 시세·장수의 정치에 따라 다르다
+SG.UI.cmdTrade = async function (cid) {
+  var c = SG.S.cities[cid];
+  var needF = Math.ceil(c.soldiers / 100);
+  var mode = SG.UI.state.tradeMode || (c.food < needF * 6 ? 'buy' : 'sell');
+  var R0 = SG.tradeRates(cid, null), amt = 0;
+  var tip = R0.since <= 2 ? '수확 직후라 식량이 쌉니다 — 사기 좋은 때' : R0.since >= 9 ? '수확 전이라 식량이 비쌉니다 — 팔기 좋은 때' : '보통 철입니다';
+  var top = h('div', { class: 'trade-top' });
+  var picks = h('div', { class: 'tpick two' }), sliderBox = h('div'), preview = h('div', { class: 'trade-prev' });
+  function maxFor(m) { return m === 'buy' ? Math.min(R0.max, Math.floor(c.gold / R0.buy) * 100) : Math.min(R0.max, Math.floor(c.food / 100) * 100); }
+  function upd() {
+    var R = R0, g = mode === 'buy' ? -Math.ceil(amt / 100 * R.buy) : Math.floor(amt / 100 * R.sell);
+    preview.innerHTML = '';
+    preview.appendChild(h('span', { class: 'tp-f ' + (mode === 'buy' ? 'up' : 'down'), text: '식량 ' + (mode === 'buy' ? '+' : '−') + SG.fmt(amt) }));
+    preview.appendChild(h('span', { class: 'tp-g ' + (g >= 0 ? 'up' : 'down'), text: '금 ' + (g >= 0 ? '+' : '−') + SG.fmt(Math.abs(g)) }));
+    preview.appendChild(h('small', { text: '(정치 높은 장수가 맡으면 조금 더 이득)' }));
+  }
+  function draw() {
+    picks.innerHTML = '';
+    [['buy', '買', '식량 사기', '금 → 식량 · 100당 금 ' + R0.buy], ['sell', '賣', '식량 팔기', '식량 → 금 · 100당 금 ' + R0.sell]].forEach(function (x) {
+      picks.appendChild(h('button', { type: 'button', class: 'tcard t-' + x[0] + (mode === x[0] ? ' on' : ''), onclick: function () { mode = x[0]; SG.UI.state.tradeMode = mode; draw(); if (top.rebuild) top.rebuild(); } },
+        [h('i', { text: x[1] }), h('b', { text: x[2] }), h('small', { text: x[3] })]));
+    });
+    var mx = maxFor(mode);
+    amt = Math.min(amt || Math.min(mx, 2000), mx);
+    sliderBox.innerHTML = '';
+    var sl = SG.UI.slider(mode === 'buy' ? '살 식량' : '팔 식량', mx, amt, function (v) { amt = v; upd(); });
+    sliderBox.appendChild(sl);
+    upd();
+  }
+  top.appendChild(picks); top.appendChild(sliderBox); top.appendChild(preview);
+  draw();
+  var oid = await SG.UI.pickOfficer(cid, '교역 — 누구에게 맡길까요?', 'pol',
+    [{ label: '100당 금', cls: 'n', get: function (o) { var R = SG.tradeRates(cid, o); return mode === 'buy' ? R.buy : R.sell; } }],
+    '이달 시세 · 식량 100 = 살 때 금 ' + R0.buy + ' · 팔 때 금 ' + R0.sell + ' · ' + tip + ' · 상업이 클수록 값이 좋고 한 번에 ' + SG.fmt(R0.max) + '까지', null, top);
+  if (!oid || !amt) { if (oid && !amt) SG.UI.toast('거래할 식량이 없습니다', true); return; }
+  await SG.UI.doCmd({ kind: 'trade', cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.trade(cid, oid, mode, amt); } });
 };
 SG.UI.cmdTrain = async function (cid) {
   var c = SG.S.cities[cid];

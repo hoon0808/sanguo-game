@@ -1356,3 +1356,17 @@ html.compact .bf-desc { font-size: 11px; }
 @keyframes csPan { from { transform: scale(1.0); } to { transform: scale(1.07); } }
 .cs-sky::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(12, 8, 4, .55), transparent 38%), linear-gradient(to right, rgba(12, 8, 4, .35), transparent 30%); }
 @media (prefers-reduced-motion: reduce) { .cs-sky .cs-bg { animation: none; } }
+/* 교역 창 */
+.t-buy { --tc: #2c6b5e; } .t-sell { --tc: #b08a3e; }
+.tpick.two { grid-template-columns: repeat(2, 1fr); }
+.trade-top .field { margin: 4px 0; }
+.trade-prev { display: flex; align-items: baseline; flex-wrap: wrap; gap: 14px; margin: 4px 0 12px; padding: 8px 12px; border: 1px dashed rgba(176, 138, 62, .55); border-radius: 4px; font-variant-numeric: tabular-nums; }
+.trade-prev span { font-family: var(--f-display); font-size: 20px; }
+.trade-prev .up { color: #2f7a3a; } .trade-prev .down { color: #a8321f; }
+.trade-prev small { color: var(--muted); font-size: 12px; }
+/* 명령 단추: PC 에서도 한 줄에 4개 */
+.cmdbox .cmd-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cmdbox .cmd { padding: 10px 2px 8px; gap: 4px; }
+.cmdbox .cmd > .ico { width: 34px; height: 34px; padding: 7px; }
+.cmdbox .cmd-l { font-size: 14px; white-space: nowrap; }
+.cmdbox .cmd-h { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

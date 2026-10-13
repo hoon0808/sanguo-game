@@ -15,7 +15,10 @@ SG.UI.FIGURES = {
     '<path d="M50 76q10 10 20 0v6q-10 8-20 0z" fill="#3a2a18"/>' +
     '<rect x="76" y="104" width="22" height="16" rx="3" fill="#c9a35a" stroke="#6b4a20"/><path d="M80 104v-4h14v4" stroke="#6b4a20" fill="none" stroke-width="2"/>' }
 };
+// 그린 초상이 있는 방문자 (Higgsfield 로 그림, img/figures/)
+SG.UI.FIGURE_IMG = { merchant: 'img/figures/merchant.jpg', merchant2: 'img/figures/merchant2.jpg' };
 SG.UI.figure = function (kind, size) {
+  if (SG.UI.FIGURE_IMG[kind]) return h('span', { class: 'pt fig', style: { width: size + 'px', height: size + 'px' } }, [h('img', { src: SG.UI.FIGURE_IMG[kind], alt: '', style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } })]);
   var f = SG.UI.FIGURES[kind] || SG.UI.FIGURES.merchant;
   return h('span', { class: 'pt fig', style: { width: size + 'px', height: size + 'px', background: 'linear-gradient(160deg,' + f.bg[0] + ',' + f.bg[1] + ')' },
     html: '<svg viewBox="0 0 120 150" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">' + f.svg + '</svg>' });

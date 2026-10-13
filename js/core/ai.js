@@ -52,6 +52,18 @@ SG.AI.city = function (cid) {
       var t = take('lead');
       if (t) { SG.cmd.train(cid, t); continue; }
     }
+    // 5-1) 교역: 식량이 모자라면 금으로 사고, 식량이 남아도는데 금이 없으면 판다
+    var needF = Math.ceil(c.soldiers / 100);
+    if (!c._traded && (c.food < needF * 4 + 500 && c.gold > 500 || c.food > needF * 30 + 20000 && c.gold < 300)) {
+      var tr = take('pol');
+      if (tr) {
+        c._traded = true;
+        var R = SG.tradeRates(cid, tr), buy = c.food < needF * 4 + 500;
+        var amt = buy ? Math.min(R.max, Math.floor((c.gold - 300) / R.buy) * 100) : Math.min(R.max, c.food - needF * 30);
+        if (amt >= 500) { SG.cmd.trade(cid, tr, buy ? 'buy' : 'sell', amt); continue; }
+        pool.push(tr);
+      }
+    }
     // 6) 개발
     if (c.gold >= 150) {
       var kinds = ['agri', 'comm'];
@@ -70,7 +82,7 @@ SG.AI.city = function (cid) {
     }
     if (!did) break;
   }
-  delete c._searched;
+  delete c._searched; delete c._traded;
 };
 
 // 앞쪽(적과 맞닿은) 도시까지 거리

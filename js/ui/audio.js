@@ -298,6 +298,8 @@ SG.Audio = (function () {
   // 곡 예약: [from, to) 시간 구간의 마디들을 만든다
   A.scheduleTrack = function (g, bus, tr, state, until) {
     var spb = 60 / tr.bpm;
+    // 탭을 오래 내려 두면 타이머가 멈춘다: 밀린 마디를 한꺼번에 울리지 말고 지금부터 다시
+    if (state.next < g.ctx.currentTime - 0.3) state.next = g.ctx.currentTime + 0.1;
     while (state.next < until) {
       var r = rng(tr.seed * 1000 + state.bar);
       tr.bar(g, bus, state.next, state.bar, spb, r, state.mel);
@@ -313,8 +315,8 @@ SG.Audio = (function () {
   A.play = function (name) {
     if (A.trackName === name && A.timer) return;
     A.stopMusic();
+    if (!A.ctx || !TRACKS[name]) return; // 아직 소리를 켤 수 없으면 곡 이름도 남기지 않는다 (나중에 누르면 시작)
     A.trackName = name;
-    if (!A.ctx || !TRACKS[name]) return;
     // 바뀔 때 부드럽게
     var tr = TRACKS[name];
     var bus = A.ctx.createGain(); bus.gain.value = 0;
@@ -328,6 +330,14 @@ SG.Audio = (function () {
     }, 250);
     A.scheduleTrack(A.g, bus, tr, A.state, A.ctx.currentTime + 1.2);
   };
+  // 지킴이: 음악이 켜져 있어야 하는데 멈춰 있으면 다시 (브라우저가 소리를 잠갔다 풀었을 때, 탭을 다시 열었을 때)
+  A.ensure = function () {
+    if (!A.ctx || !A.settings.music || !A.want) return;
+    if (A.ctx.state !== 'running') { try { A.ctx.resume(); } catch (e) { /* 누를 때 다시 */ } return; }
+    if (A.trackName !== A.want || !A.timer) A.play(A.want);
+  };
+  setInterval(function () { A.ensure(); }, 2000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) A.ensure(); });
   A.stopMusic = function () {
     if (A.timer) clearInterval(A.timer);
     A.timer = null;

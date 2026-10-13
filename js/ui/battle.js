@@ -32,7 +32,7 @@ SG.UI.tactical = function (atk, def) {
     var B = SG.T.create(atk, def);
     SG.UI.music('battle');
     var me = SG.isPlayer(atk.fid) ? 'atk' : 'def';
-    var st = { sel: null, mode: 'idle', prev: null, auto: false, anim: false, flash: {} };
+    var st = { sel: null, mode: 'idle', form: 'normal', prev: null, auto: false, anim: false, flash: {} };
     var fcol = { atk: SG.S.forces[atk.fid].color, def: def.fid ? SG.S.forces[def.fid].color : '#777' };
     var fname = { atk: SG.forceName(atk.fid), def: def.fid ? SG.forceName(def.fid) : '수비군' };
 
@@ -247,10 +247,11 @@ SG.UI.tactical = function (atk, def) {
       setTimeout(function () { st.lunge = null; st.hit = null; }, 420);
     }
     // 공격 연출 한 번에
-    function attackFx(a, t, before) {
+    function attackFx(a, t, before, form) {
       var ranged = SG.T.dist([a.c, a.r], [t.c, t.r]) > 1;
-      SG.UI.sfx(ranged ? 'arrow' : 'clash');
-      if (ranged) volley(a, t); else { lunge(a, t); slash(t); }
+      SG.UI.sfx(ranged || form === 'volley' ? 'arrow' : form === 'charge' ? 'broken' : 'clash');
+      if (ranged || form === 'volley') { volley(a, t); (B.lastHits || []).forEach(function (hh) { if (hh.u !== t) volley(a, hh.u); }); }
+      else { lunge(a, t); slash(t); if (form === 'combo') setTimeout(function () { SG.UI.sfx('clash'); lunge(a, t); slash(t); redraw(); }, 380); }
       var lost = before - t.n;
       if (t.n <= 0) { setTimeout(function () { broken(t); }, ranged ? 420 : 150); SG.UI.sfx('broken'); }
       else if (lost > t.max * 0.12) shake(false);
@@ -276,7 +277,7 @@ SG.UI.tactical = function (atk, def) {
         S2('polygon', { points: SG.UI.hexPoints(p.x, p.y, R - 2.5), class: cls }, gHi);
       }
       if (st.mode === 'move') Object.keys(SG.T.reachable(B, u)).forEach(function (k) { var q = k.split(',').map(Number); mark(q[0], q[1], 'hl-move'); });
-      if (st.mode === 'attack') SG.T.attackTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-atk'); });
+      if (st.mode === 'attack') SG.T.formTargets(B, u, st.form).forEach(function (t) { mark(t.c, t.r, 'hl-atk'); });
       if (st.mode === 'fire' || st.mode === 'confuse') SG.T.stratTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-strat'); });
       if (st.mode === 'duel') SG.T.duelTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-atk'); });
     }
@@ -329,7 +330,12 @@ SG.UI.tactical = function (atk, def) {
         if (u.side === me && myTurn() && !u.done) {
           var acts = h('div', { class: 'cmd-grid' });
           function add(label, mode, enabled, cls) {
-            acts.appendChild(h('button', { class: 'cmd' + (st.mode === mode ? ' on-mode' : '') + (cls ? ' ' + cls : ''), type: 'button', disabled: !enabled ? true : null, onclick: function () { st.mode = mode; redraw(); } },
+            acts.appendChild(h('button', { class: 'cmd' + (st.mode === mode ? ' on-mode' : '') + (cls ? ' ' + cls : ''), type: 'button', disabled: !enabled ? true : null, onclick: function () {
+              st.mode = mode;
+              // 공격: 쓸 수 있는 형태 중 지난번 것, 없으면 보통 공격
+              if (mode === 'attack' && SG.T.formsOf(B, u).indexOf(st.form) < 0) st.form = 'normal';
+              redraw();
+            } },
               [SG.UI.icon(CMD_ICON[mode] || 'order', 20), h('span', { class: 'cmd-l', text: label })]));
           }
           add('이동', 'move', !u.moved);
@@ -339,9 +345,19 @@ SG.UI.tactical = function (atk, def) {
           add('일기토', 'duel', SG.T.duelTargets(B, u).length > 0, 'war');
           acts.appendChild(h('button', { class: 'cmd', type: 'button', onclick: function () { SG.T.wait(B, u); st.sel = null; st.mode = 'idle'; redraw(); autoEndCheck(); } }, [SG.UI.icon('check', 20), h('span', { class: 'cmd-l', text: '대기' })]));
           if (u.moved && st.prev) acts.appendChild(h('button', { class: 'cmd', type: 'button', onclick: function () { u.c = st.prev[0]; u.r = st.prev[1]; u.moved = false; st.prev = null; st.mode = 'move'; redraw(); } }, [SG.UI.icon('next', 20, 'flip'), h('span', { class: 'cmd-l', text: '이동 취소' })]));
-          side.appendChild(h('div', { class: 'sec' }, [h('h4', { text: '명령' }), acts,
+          // 공격 형태 고르기 (공격 단추를 누르면 펼쳐짐)
+          var formsEl = null;
+          if (st.mode === 'attack') {
+            var okF = SG.T.formsOf(B, u);
+            formsEl = h('div', { class: 'bt-forms' }, [h('div', { class: 'bf-row' }, SG.T.FORM_KEYS.map(function (f) {
+              var F = SG.T.FORMS[f], ok = okF.indexOf(f) >= 0;
+              return h('button', { class: 'bf' + (st.form === f ? ' on' : ''), type: 'button', disabled: !ok || null, title: F.desc, onclick: function () { st.form = f; redraw(); } },
+                [h('i', { text: F.h }), h('span', { text: F.n })]);
+            })), h('p', { class: 'bf-desc', text: SG.T.FORMS[st.form].desc })]);
+          }
+          side.appendChild(h('div', { class: 'sec' }, [h('h4', { text: '명령' }), acts, formsEl,
             h('p', { class: 'note', style: { marginTop: '8px' }, text: st.mode === 'move' ? '밝은 칸을 눌러 이동하세요. 제자리면 자기 칸을 누르세요.' :
-              st.mode === 'attack' ? '붉은 칸의 적을 누르세요.' : st.mode === 'duel' ? '붉은 칸의 적 장수에게 일기토를 신청합니다.' :
+              st.mode === 'attack' ? '공격 형태를 고르고 붉은 칸의 적을 누르세요.' : st.mode === 'duel' ? '붉은 칸의 적 장수에게 일기토를 신청합니다.' :
               (st.mode === 'fire' || st.mode === 'confuse') ? '금빛 칸의 적을 누르세요. 지력이 높을수록 성공합니다.' : '' })]));
         }
       } else {
@@ -438,8 +454,11 @@ SG.UI.tactical = function (atk, def) {
           if (c === u.c && r === u.r) { st.mode = 'idle'; u.moved = true; st.prev = [c, r]; redraw(); return; }
           if (reach[k] !== undefined) { st.prev = [u.c, u.r]; SG.T.move(B, u, c, r); st.mode = 'idle'; redraw(); if (B.over) finish(); return; }
         }
-        if (st.mode === 'attack' && x && SG.T.attackTargets(B, u).indexOf(x) >= 0) {
-          var before = x.n; SG.T.attack(B, u, x); attackFx(u, x, before); flash(x, '-' + SG.fmt(before - x.n));
+        if (st.mode === 'attack' && x && SG.T.formTargets(B, u, st.form).indexOf(x) >= 0) {
+          var before = x.n, ub = u.n; SG.T.attack(B, u, x, st.form); attackFx(u, x, before, st.form);
+          (B.lastHits || []).forEach(function (hh) { if (hh.u !== x) flash(hh.u, '-' + SG.fmt(hh.dmg)); });
+          flash(x, '-' + SG.fmt(before - x.n));
+          if (st.form !== 'normal') flash(u, SG.T.FORMS[st.form].n + '!' + (ub > u.n ? ' -' + SG.fmt(ub - u.n) : ''));
           return afterAct();
         }
         if ((st.mode === 'fire' || st.mode === 'confuse') && x && SG.T.stratTargets(B, u).indexOf(x) >= 0) {
@@ -568,7 +587,7 @@ SG.UI.tactical = function (atk, def) {
           var ev = SG.T.aiAct(B, u);
           for (var j = 0; j < ev.length; j++) {
             var e = ev[j];
-            if (e.type === 'attack') attackFx(e.u, e.t, before[e.t.id]);
+            if (e.type === 'attack') attackFx(e.u, e.t, before[e.t.id], e.form);
             if (e.type === 'strat') {
               var fireOk = /화계!/.test(e.msg), confOk = /혼란에 빠졌다/.test(e.msg);
               SG.UI.sfx(fireOk ? 'fire' : confOk ? 'confuse' : 'fail');

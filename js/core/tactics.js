@@ -179,7 +179,7 @@ SG.T.range = function (u) { return (u.t === 'arc' ? 2 : 1) + (u.sk === '궁신' 
 SG.T.attackTargets = function (B, u) {
   return SG.T.alive(B).filter(function (x) { return x.side !== u.side && SG.T.dist([u.c, u.r], [x.c, x.r]) <= SG.T.range(u); });
 };
-SG.T.damage = function (B, a, d, mult) {
+SG.T.damage = function (B, a, d, mult, flat) {
   var aStat = a.war * 0.6 + a.lead * 0.4 + (a.sk === '무쌍' ? 8 : 0);
   var dStat = d.lead * 0.6 + d.war * 0.4;
   var ratio = SG.clamp((aStat + 20) / (dStat + 20), 0.5, 2);
@@ -198,7 +198,7 @@ SG.T.damage = function (B, a, d, mult) {
   if (tt === 'water' && d.sk === '수군') td = 1.1;
   if (d.side === 'def' && (tt === 'gate' || tt === 'castle' || tt === 'keep')) td *= B.wallBonus;
   if (d.sk === '철벽') td *= 1.2;
-  dmg = dmg / td * SG.randf(0.85, 1.15);
+  dmg = dmg / td * (flat ? 1 : SG.randf(0.85, 1.15));
   return Math.max(10, Math.round(dmg));
 };
 SG.T.hit = function (B, d, dmg) {
@@ -207,20 +207,82 @@ SG.T.hit = function (B, d, dmg) {
   if (d.n <= 0) SG.T.broken(B, d);
   return dmg;
 };
-SG.T.attack = function (B, a, d) {
+// 공격 형태 (전법). 공격 단추를 누른 뒤 고른다.
+SG.T.FORMS = {
+  normal: { n: '공격', h: '攻', desc: '보통 공격. 맞붙어 싸우면 반격을 받습니다.' },
+  charge: { n: '돌격', h: '突', desc: '적진에 달려듭니다. 피해 ×1.3 (기병이 움직인 뒤면 ×1.43), 적 사기가 더 떨어집니다. 대신 반격을 세게(×1.5) 받습니다. 궁병은 못 씀.' },
+  combo: { n: '연속 공격', h: '連', desc: '무력 80 이상 장수만. 두 번 잇달아 칩니다 (0.65 + 0.65). 반격은 한 번.' },
+  volley: { n: '일제 사격', h: '射', desc: '궁병만. 화살비로 목표(×0.9)와 그 옆의 적(×0.35)까지 맞힙니다. 반격 없음.' },
+  pincer: { n: '협공', h: '挾', desc: '목표 옆에 아군이 있어야 합니다. 옆 아군 하나마다 피해 +20%, 반격은 −30%.' }
+};
+SG.T.FORM_KEYS = ['normal', 'charge', 'combo', 'volley', 'pincer'];
+// 목표 옆에 붙어 있는 (공격자 말고) 아군 수
+SG.T.flankers = function (B, a, d) {
+  return SG.T.neighbors(d.c, d.r).filter(function (nb) { var x = SG.T.at(B, nb[0], nb[1]); return x && x !== a && x.side === a.side && x.n > 0; }).length;
+};
+SG.T.formOk = function (B, a, d, form) {
   var dist = SG.T.dist([a.c, a.r], [d.c, d.r]);
-  var ranged = dist > 1;
-  var dmg = SG.T.hit(B, d, SG.T.damage(B, a, d, ranged ? (a.t === 'arc' ? 0.85 : 0.7) : 1));
-  var msg = a.name + '이(가) ' + d.name + '을(를) ' + (ranged ? '활로 쏘았다' : '공격했다') + ' (-' + SG.fmt(dmg) + ')';
-  if (d.n > 0 && !ranged && d.conf <= 0) {
-    var back = SG.T.hit(B, a, Math.round(SG.T.damage(B, d, a, d.t === 'arc' ? 0.35 : 0.5)));
+  if (dist > SG.T.range(a)) return false;
+  if (form === 'charge') return dist === 1 && a.t !== 'arc';
+  if (form === 'combo') return dist === 1 && a.war >= 80;
+  if (form === 'volley') return a.t === 'arc';
+  if (form === 'pincer') return dist === 1 && SG.T.flankers(B, a, d) > 0;
+  return true;
+};
+SG.T.formTargets = function (B, u, form) {
+  return SG.T.attackTargets(B, u).filter(function (x) { return SG.T.formOk(B, u, x, form || 'normal'); });
+};
+SG.T.formsOf = function (B, u) {
+  return SG.T.FORM_KEYS.filter(function (f) { return SG.T.formTargets(B, u, f).length > 0; });
+};
+// 한 번 공격의 계획: 누구에게 얼마씩 (flat=true 면 예상치)
+SG.T.formPlan = function (B, a, d, form, flat) {
+  var T = SG.T, dist = T.dist([a.c, a.r], [d.c, d.r]), ranged = dist > 1;
+  var base = ranged ? (a.t === 'arc' ? 0.85 : 0.7) : 1, hits = [], counter = 0;
+  var cm = d.t === 'arc' ? 0.35 : 0.5;
+  if (form === 'charge') { hits.push([d, T.damage(B, a, d, 1.3 * (a.t === 'cav' && a.moved ? 1.1 : 1), flat)]); counter = 1.5; }
+  else if (form === 'combo') { hits.push([d, T.damage(B, a, d, 0.65, flat)]); hits.push([d, T.damage(B, a, d, 0.65, flat)]); counter = 1; }
+  else if (form === 'volley') {
+    hits.push([d, T.damage(B, a, d, 0.9, flat)]);
+    T.neighbors(d.c, d.r).forEach(function (nb) { var x = T.at(B, nb[0], nb[1]); if (x && x.side !== a.side) hits.push([x, T.damage(B, a, x, 0.35, flat)]); });
+  } else if (form === 'pincer') { var k = Math.min(3, T.flankers(B, a, d)); hits.push([d, T.damage(B, a, d, 1 + 0.2 * k, flat)]); counter = Math.max(0, 1 - 0.3 * k); }
+  else { hits.push([d, T.damage(B, a, d, base, flat)]); counter = ranged ? 0 : 1; }
+  return { hits: hits, counter: ranged ? 0 : counter * cm };
+};
+// AI: 예상 이득(준 피해 − 받을 반격 × 0.8)이 가장 큰 형태
+SG.T.bestForm = function (B, a, d) {
+  var best = 'normal', bv = -1e9;
+  SG.T.FORM_KEYS.forEach(function (f) {
+    if (!SG.T.formOk(B, a, d, f)) return;
+    var p = SG.T.formPlan(B, a, d, f, true);
+    var dealt = p.hits.reduce(function (s, x) { return s + Math.min(x[0].n, x[1]); }, 0);
+    var back = p.counter ? Math.min(a.n, SG.T.damage(B, d, a, p.counter, true)) : 0;
+    var v = dealt - back * 0.8;
+    if (v > bv) { bv = v; best = f; }
+  });
+  return best;
+};
+SG.T.attack = function (B, a, d, form) {
+  var T = SG.T;
+  form = form && T.formOk(B, a, d, form) ? form : 'normal';
+  var dist = T.dist([a.c, a.r], [d.c, d.r]), ranged = dist > 1;
+  var p = T.formPlan(B, a, d, form), done = {}, msg;
+  B.lastHits = [];
+  p.hits.forEach(function (x) { if (x[0].n <= 0) return; var got = T.hit(B, x[0], x[1]); done[x[0].id] = (done[x[0].id] || 0) + got; B.lastHits.push({ u: x[0], dmg: got }); });
+  var main = done[d.id] || 0;
+  var verb = { charge: '에 돌격했다', combo: '을(를) 연달아 베었다', volley: '에 화살비를 퍼부었다', pincer: '을(를) 협공했다' }[form] || (ranged ? '을(를) 활로 쏘았다' : '을(를) 공격했다');
+  msg = a.name + '이(가) ' + d.name + verb + ' (-' + SG.fmt(main) + ')';
+  var side = B.lastHits.filter(function (x) { return x.u !== d; });
+  if (side.length) msg += ', 옆 부대 ' + side.map(function (x) { return x.u.name + ' -' + SG.fmt(x.dmg); }).join(', ');
+  if (d.n > 0 && p.counter > 0 && d.conf <= 0) {
+    var back = T.hit(B, a, Math.round(T.damage(B, d, a, p.counter)));
     msg += ', 반격 -' + SG.fmt(back);
   }
   if (d.n <= 0) msg += ' — ' + d.name + ' 부대 궤멸!';
   B.log.push(msg);
   a.done = true;
-  SG.T.moraleShift(B, a.side, d.n <= 0 ? 4 : 1);
-  SG.T.checkEnd(B);
+  T.moraleShift(B, a.side, (d.n <= 0 ? 4 : 1) + (form === 'charge' ? 2 : 0));
+  T.checkEnd(B);
   return msg;
 };
 SG.T.moraleShift = function (B, side, v) {
@@ -413,7 +475,7 @@ SG.T.aiAct = function (B, u) {
   if (plan.c !== u.c || plan.r !== u.r) { T.move(B, u, plan.c, plan.r); events.push({ type: 'move', u: u, from: from }); }
   if (B.over) return events;
   var targets = T.attackTargets(B, u).sort(function (a, b) { return (a.n / SG.match(u.t, a.t)) - (b.n / SG.match(u.t, b.t)); });
-  if (targets.length) events.push({ type: 'attack', u: u, t: targets[0], msg: T.attack(B, u, targets[0]) });
+  if (targets.length) { var fm = T.bestForm(B, u, targets[0]); events.push({ type: 'attack', u: u, t: targets[0], form: fm, msg: T.attack(B, u, targets[0], fm) }); }
   else u.done = true;
   return events;
 };

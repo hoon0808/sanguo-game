@@ -1339,3 +1339,14 @@ kbd { display: inline-block; min-width: 92px; text-align: center; padding: 2px 8
 .dr-act .pt { flex: none; }
 .dr-act.ng { opacity: .7; }
 .deleg-rep .rc-k { white-space: nowrap; }
+/* 직접 지휘: 공격 형태 고르기 (攻 突 連 射 挾) */
+.bt-forms { margin-top: 10px; padding: 8px; border: 1px solid rgba(176, 138, 62, .5); border-radius: 4px; background: rgba(142, 44, 34, .07); animation: fade .2s; }
+.bf-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.bf { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; font-family: inherit; font-size: 11px; line-height: 1.1; }
+.bf i { font-style: normal; font-family: var(--f-display); font-size: 17px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 3px; background: #8e2c22; color: #f6dfa0; box-shadow: inset 0 0 0 1px rgba(246, 223, 160, .5); }
+.bf.on { border-color: #8e2c22; background: rgba(142, 44, 34, .14); box-shadow: 0 0 0 1px #8e2c22; font-weight: 700; }
+.bf:disabled { opacity: .35; cursor: default; }
+.bf:disabled i { background: #77706a; }
+.bf-desc { margin: 7px 2px 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+html.compact .bf i { width: 24px; height: 24px; font-size: 14px; }
+html.compact .bf-desc { font-size: 11px; }

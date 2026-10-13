@@ -338,3 +338,10 @@ html.portrait .modal table.t th, html.portrait .modal table.t td { white-space: 
 html.portrait .brief { flex-direction: column; align-items: stretch; gap: 8px; }
 html.portrait .brief .gauge { width: auto; }
 html.portrait .brief-t .chip-b { white-space: normal; }
+/* 명령 단추: 작게 (메달 30px, 한 줄 4개) */
+html.compact .cmdbox .cmd-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+html.compact .cmdbox .cmd { min-height: 0; padding: 7px 2px 6px; gap: 3px; }
+html.compact .cmdbox .cmd > .ico { width: 30px; height: 30px; padding: 6px; }
+html.compact .cmdbox .cmd-l { font-size: 12.5px; white-space: nowrap; }
+html.compact .cmdbox .cmd-h { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+html.compact .cmdbox .cmd-tab { min-height: 38px; padding: 5px 2px; font-size: 11px; }

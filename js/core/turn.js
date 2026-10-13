@@ -17,9 +17,9 @@ SG.endTurn = async function () {
   if (S.over) return;
   if (S.player && SG.S.forces[S.player].alive) {
     var mine = SG.citiesOf(S.player);
+    // 위임한 도시만 태수가 움직인다 (위임하지 않은 도시의 장수·병사는 건드리지 않는다. 단, 위임 도시가 이웃 후방 도시의 남는 병사를 데려올 수는 있다)
     var reps = mine.filter(function (cid) { return S.cities[cid].deleg; }).map(SG.runDelegated);
     if (reps.length && SG.ui && SG.ui.delegReport) await SG.ui.delegReport(reps);
-    if (reps.length) await SG.AI.military(S.player, true);
   }
   var order = SG.shuffle(SG.aliveForces().filter(function (f) { return f !== S.player; }));
   for (var i = 0; i < order.length; i++) {
@@ -37,12 +37,47 @@ SG.runDelegated = function (cid) {
   SG.DELEG_FIELDS.forEach(function (f) { before[f] = c[f]; });
   var idle = SG.readyOfficers(cid).length, acts;
   SG.cmdLog = [];
-  try { SG.AI.city(cid); } finally { acts = SG.cmdLog; SG.cmdLog = null; }
+  try { SG.delegLogistics(cid); SG.AI.city(cid); } finally { acts = SG.cmdLog; SG.cmdLog = null; }
   SG.DELEG_FIELDS.forEach(function (f) { after[f] = c[f]; });
   acts.forEach(function (a) { SG.log(null, SG.cityName(cid) + '(위임) — ' + a.msg, 'deleg'); });
   var why = acts.length ? '' : !idle ? '이번 달은 직접 명령을 내려서 남은 장수가 없었습니다' :
     c.gold < 150 ? '금이 모자라 할 수 있는 일이 없었습니다 (금 ' + c.gold + ')' : '지금은 더 할 일이 없다고 보았습니다';
   return { cid: cid, before: before, after: after, acts: acts, idle: idle, why: why };
+};
+// 도시가 지켜야 할 병사 수 (전방: 이웃 적 병력 이상, 후방: 조금)
+SG.garrisonWant = function (cid) {
+  var th = SG.threat(cid), size = SG.CITIES[cid].size;
+  return th.front ? Math.min(60000, Math.max(th.max, 7000 + size * 4000)) : 3000 + size * 1000;
+};
+// 위임 태수의 병력 조정: 전방이면 이웃 후방 도시의 남는 병사를 데려오고, 후방이면 남는 병사를 이웃 전방 도시로 보낸다.
+// 일은 이 도시 장수 중 정치가 가장 낮은 한두 명이 맡는다 (개발 잘하는 장수는 남겨 둔다).
+SG.delegLogistics = function (cid) {
+  var S = SG.S, c = S.cities[cid], fid = c.owner;
+  var pool = SG.readyOfficers(cid).sort(function (a, b) { return SG.O(a).pol - SG.O(b).pol; });
+  if (pool.length < 2) return; // 한 명뿐이면 도시 일을 먼저
+  var spare = function (x) { return SG.threat(x).front ? 0 : Math.max(0, S.cities[x].soldiers - SG.garrisonWant(x)); };
+  var foodFor = function (src, n) { return Math.floor(Math.min(S.cities[src].food * 0.5, n / 100 * 6)); };
+  var nbrs = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === fid; });
+  var jobs = 0;
+  if (SG.threat(cid).front) {
+    var need = SG.garrisonWant(cid) - c.soldiers;
+    nbrs.map(function (n) { return [n, spare(n)]; }).filter(function (x) { return x[1] >= 1000; })
+      .sort(function (a, b) { return b[1] - a[1]; }).forEach(function (x) {
+        if (need < 1000 || jobs >= 2 || pool.length < 2) return;
+        var n = Math.floor(Math.min(need, x[1]) / 100) * 100;
+        var r = SG.cmd.transport(cid, pool.shift(), x[0], cid, n, foodFor(x[0], n));
+        if (r.ok) { need -= n; jobs++; }
+      });
+  } else {
+    var have = spare(cid);
+    nbrs.filter(function (n) { return SG.threat(n).front; }).map(function (n) { return [n, SG.garrisonWant(n) - S.cities[n].soldiers]; })
+      .filter(function (x) { return x[1] >= 1000; }).sort(function (a, b) { return b[1] - a[1]; }).forEach(function (x) {
+        if (have < 1000 || jobs >= 2 || pool.length < 2) return;
+        var n = Math.floor(Math.min(have, x[1]) / 100) * 100;
+        var r = SG.cmd.transport(cid, pool.shift(), cid, x[0], n, foodFor(cid, n));
+        if (r.ok) { have -= n; jobs++; }
+      });
+  }
 };
 
 SG.nextMonth = async function () {

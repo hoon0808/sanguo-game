@@ -202,6 +202,27 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   return { ok: true, msg: oids.map(SG.name).join(', ') + '이(가) ' + SG.cityName(dest) + '(으)로 이동했다' + (extra.length ? ' (' + extra.join(', ') + ')' : '') + '.' };
 };
 
+// ---- 수송 (위임 태수용): cid 의 장수 oid 가 이웃 우리 도시 src → dest 로 병사·식량을 옮긴다. 장수는 제자리에 남는다.
+SG.cmd.transport = function (cid, oid, src, dest, soldiers, food) {
+  var a = SG.S.cities[src], b = SG.S.cities[dest];
+  if (src !== cid && dest !== cid) return fail('이 도시와 이웃 도시 사이만 옮길 수 있습니다');
+  if (SG.ADJ[src].indexOf(dest) < 0 || a.owner !== b.owner || a.owner !== SG.S.cities[cid].owner) return fail('붙어 있는 우리 도시끼리만 옮길 수 있습니다');
+  if (!SG.ready(cid, oid)) return fail('명령할 수 없는 장수입니다');
+  soldiers = SG.clamp(Math.floor(soldiers || 0), 0, a.soldiers);
+  food = SG.clamp(Math.floor(food || 0), 0, a.food);
+  if (!soldiers && !food) return fail('옮길 것이 없습니다');
+  if (soldiers > 0) {
+    b.train = Math.round((b.train * b.soldiers + a.train * soldiers) / (b.soldiers + soldiers));
+    b.morale = Math.round((b.morale * b.soldiers + a.morale * soldiers) / (b.soldiers + soldiers));
+  }
+  var mix = SG.mixOf(src, soldiers);
+  SG.takeTroops(a, mix, src); SG.putTroops(b, mix, dest);
+  a.food -= food; b.food += food;
+  var what = [soldiers ? '병사 ' + SG.fmt(soldiers) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
+  return done(oid, src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 보냈다.'
+    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + what + '을(를) 데려왔다.', { moved: soldiers, src: src, dest: dest });
+};
+
 // ---- 주인 없는 도시 차지 (전투 없이)
 SG.occupy = function (cid, oids, dest, soldiers, food) {
   var c = SG.S.cities[cid], d = SG.S.cities[dest];

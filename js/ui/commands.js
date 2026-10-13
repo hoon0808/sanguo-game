@@ -54,7 +54,7 @@ SG.UI.commandBox = function (cid) {
     tabs.appendChild(h('button', { class: 'cmd-tab', type: 'button', role: 'tab', 'data-tab': g.name, onclick: function () { show(g.name); } }, [SG.UI.icon(TAB_ICON[g.name] || 'order', 16), g.name]));
   });
   sec.appendChild(h('h4', null, ['명령', h('label', { class: 'note', style: { cursor: 'pointer' }, title: '켜면 이 도시의 내정을 컴퓨터가 알아서 합니다 (출진은 하지 않음)' }, [
-    h('input', { type: 'checkbox', checked: c.deleg || null, onchange: function (e) { c.deleg = e.target.checked; SG.UI.toast(SG.cityName(cid) + (c.deleg ? ' 내정을 맡겼습니다 (턴 종료 때 실행)' : ' 위임을 풀었습니다')); } }),
+    h('input', { type: 'checkbox', checked: c.deleg || null, onchange: function (e) { c.deleg = e.target.checked; SG.UI.toast(SG.josa(SG.cityName(cid) + (c.deleg ? '을(를) 태수에게 맡겼습니다 — 턴 종료 때 내정·징병·병력 수송을 알아서 합니다' : ' 위임을 풀었습니다'))); } }),
     ' 위임'
   ])]));
   sec.appendChild(tabs);

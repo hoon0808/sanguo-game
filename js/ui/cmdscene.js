@@ -42,8 +42,19 @@ SG.UI.CMD_TITLE = { locust: '메뚜기 떼', plague: '역병', flood: '홍수', 
 
 // ---- 배경 그림
 SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drought: 'field', plague: 'village', riot: 'village', quake: 'wall' };
+// 그린 배경 그림이 있는 장면 (img/scene/<이름>.jpg, Higgsfield 로 그림). 없으면 아래 SVG 로 그린다
+SG.UI.SCENE_IMG = { field: 1, market: 1, wall: 1, village: 1, drill: 1, road: 1, night: 1 };
+// 처음 장면이 열릴 때 그림이 늦게 뜨지 않도록 미리 받아 둔다
+window.addEventListener('load', function () {
+  setTimeout(function () { Object.keys(SG.UI.SCENE_IMG).forEach(function (k) { (new Image()).src = 'img/scene/' + k + '.jpg'; }); }, 1500);
+});
 SG.UI.sceneBackdrop = function (bg0, color) {
   var bg = SG.UI.DISASTER_BASE[bg0] || bg0;
+  if (SG.UI.SCENE_IMG[bg]) {
+    return '<svg class="cs-bg" viewBox="0 0 1100 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+      '<image href="img/scene/' + bg + '.jpg" x="0" y="0" width="1100" height="500" preserveAspectRatio="xMidYMid slice"/>' +
+      SG.UI.disasterOverlay(bg0) + '</svg>';
+  }
   var night = bg === 'night' || bg0 === 'riot', s = '<svg class="cs-bg" viewBox="0 0 1100 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>' +
     '<linearGradient id="cs-sky" x1="0" y1="0" x2="0" y2="1">' + (night ? '<stop offset="0" stop-color="#0d1430"/><stop offset=".7" stop-color="#2a3358"/>' : '<stop offset="0" stop-color="#8fb7d8"/><stop offset=".7" stop-color="#f3e2b8"/>') + '</linearGradient></defs>' +
     '<rect width="1100" height="500" fill="url(#cs-sky)"/>';

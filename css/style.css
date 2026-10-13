@@ -1350,3 +1350,9 @@ kbd { display: inline-block; min-width: 92px; text-align: center; padding: 2px 8
 .bf-desc { margin: 7px 2px 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 html.compact .bf i { width: 24px; height: 24px; font-size: 14px; }
 html.compact .bf-desc { font-size: 11px; }
+/* 명령 장면 배경 그림: 천천히 다가가는 움직임 + 아래쪽 어둡게 (대사창이 잘 보이게) */
+.cs-sky { overflow: hidden; }
+.cs-sky .cs-bg { animation: csPan 18s ease-out both; transform-origin: 60% 55%; }
+@keyframes csPan { from { transform: scale(1.0); } to { transform: scale(1.07); } }
+.cs-sky::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(12, 8, 4, .55), transparent 38%), linear-gradient(to right, rgba(12, 8, 4, .35), transparent 30%); }
+@media (prefers-reduced-motion: reduce) { .cs-sky .cs-bg { animation: none; } }

@@ -90,21 +90,42 @@ SG.ui.captive = async function (oid, captor) {
     choices: [{ label: '처형', value: 'execute', cls: 'war' }, { label: '풀어 주기', value: 'release' }, { label: '항복 권유', value: 'recruit', cls: 'primary' }] });
 };
 
-// ---- 참모 보고: 달이 바뀌면 참모가 찾아와 이달에 살필 일을 아뢴다 (닫으면 그달은 끝, 위쪽 「참모」로 다시 볼 수 있음)
+// ---- 군사 보고: 달이 바뀌면 군사가 찾아와 이달에 살필 일을 아뢴다 (닫으면 그달은 끝, 위쪽 「군사」로 다시 볼 수 있음)
 SG.UI.briefOn = function () { try { return localStorage.getItem('sanguo_brief') !== 'off'; } catch (e) { return true; } };
 SG.UI.setBrief = function (on) { try { localStorage.setItem('sanguo_brief', on ? 'on' : 'off'); } catch (e) { /* 무시 */ } };
-SG.UI.advisorOf = function () {
-  var S = SG.S, offs = SG.officersOf(S.player).filter(function (o) { return o !== S.forces[S.player].lord; });
-  return (offs.length ? offs : [S.forces[S.player].lord]).sort(function (a, b) { return SG.O(b).int - SG.O(a).int; })[0];
+SG.UI.advisorOf = function () { return SG.advisorOf(SG.S.player); };
+// 군사 임명 창: 지력 순, 군사의 지력이 높을수록 보고가 자세하고 전투 계략이 잘 먹힌다
+SG.UI.appointStrategist = async function () {
+  var S = SG.S, fid = S.player, f = S.forces[fid], cur = SG.strategist(fid), pick = null;
+  var offs = SG.officersOf(fid).filter(function (o) { return o !== f.lord && !S.off[o].march; });
+  if (!offs.length) { SG.UI.toast('군사로 임명할 장수가 없습니다', true); return false; }
+  var body = h('div', null, [
+    h('p', { class: 'note', text: '군사는 달마다 「군사 보고」로 나라의 일을 아룁니다. 지력이 높을수록 보고가 자세해지고(지력 85↑ 적 장수의 약점·숨은 보물 소문, 90↑ 적의 침공 낌새까지), 군사가 직접 지휘 전투에 함께 나가면 우리 부대의 화계·혼란 성공률이 8% 오릅니다. 새로 임명된 장수는 충성 +5. 명령 횟수는 쓰지 않습니다.' + (cur ? '' : ' 지금은 임명한 군사가 없어 지력이 가장 높은 장수가 대신 아뢰고 있습니다.') }),
+    h('div', { class: 'pick-list' }, [SG.UI.officerTable(offs, {
+      sortBy: { get: function (o) { return SG.O(o).int; } },
+      cols: [{ label: '보고', cls: 'n', get: function (o) { var i = SG.O(o).int; return i >= 90 ? '아주 자세함' : i >= 85 ? '자세함' : i >= 70 ? '보통' : '간단'; } },
+        { label: '있는 곳', get: function (o) { return SG.cityName(S.off[o].c); } },
+        { label: '지금', cls: 'n', get: function (o) { return o === cur ? '군사' : ''; } }],
+      onPick: function (o) { pick = o; var b = document.querySelector('#modal-root .back:last-child .modal-f .btn'); if (b) b.click(); }
+    })])
+  ]);
+  await SG.UI.modal({ title: '군사 임명 — 누구를 군사로 삼을까요?', icon: 'scroll', body: body, size: 'wide', cancel: true, buttons: [{ label: '닫기', value: true }] });
+  if (!pick || pick === cur) return false;
+  var r = SG.appointStrategist(fid, pick);
+  SG.UI.toast(r.msg, !r.ok);
+  if (r.ok) SG.UI.sfx('recruit');
+  SG.UI.refresh();
+  return r.ok;
 };
 SG.UI.briefing = function (force) {
   var S = SG.S;
   if (!S.player || !S.forces[S.player] || !S.forces[S.player].alive || S.over) return Promise.resolve();
   var list = SG.UI.advice();
   if (!force && !list.length) return Promise.resolve();
-  var adv = SG.UI.advisorOf(), closeFn = null;
+  var adv = SG.UI.advisorOf(), closeFn = null, appointed = SG.strategist(S.player) === adv, ai = SG.O(adv).int;
   var panel = h('div', { class: 'brief-list' }, [
-    h('div', { class: 'bl-h' }, [h('i', { text: '奏' }), '이달의 보고', h('small', { text: S.year + '년 ' + S.month + '월 · ' + list.length + '건' })]),
+    h('div', { class: 'bl-h' }, [h('i', { text: '奏' }), '이달의 보고', h('small', { text: S.year + '년 ' + S.month + '월 · ' + list.length + '건' }),
+      h('span', { class: 'bl-adv', text: (appointed ? '군사 ' : '임시 군사 ') + SG.name(adv) + ' · 지력 ' + ai })]),
     list.length ? h('div', { class: 'bl-items' }, list.slice(0, 8).map(function (it, i) {
       return h('div', { class: 'bl-item' + (it.w >= 7 ? ' hi' : it.w >= 4 ? ' mid' : ''), style: { animationDelay: (0.25 + i * 0.08) + 's' } }, [
         h('span', { class: 'bl-n', text: String(i + 1) }), h('span', { class: 'bl-t', text: it.t }),
@@ -116,6 +137,8 @@ SG.UI.briefing = function (force) {
   var first = list[0];
   var text = first && first.w > 1 ? '주공, 이달에 살피실 일이 ' + list.length + '가지 있습니다.\n가장 급한 것은 — ' + first.t
     : '주공, 이달은 별다른 걱정이 없습니다.\n차근차근 나라를 키우십시오.';
-  return SG.UI.audience({ visitor: adv, kind: 'advisor', title: '참모 보고', icon: 'scroll', text: text, extra: panel, noHost: true,
-    choices: [{ label: '닫기', value: true, cls: 'primary' }], auto: true, onOpen: function (box, close) { closeFn = close; } });
+  if (!SG.strategist(S.player)) text += '\n(아직 군사를 정하지 않으셨습니다. 「군사 임명」으로 책사를 곁에 두십시오.)';
+  return SG.UI.audience({ visitor: adv, kind: 'advisor', title: '군사 보고', icon: 'scroll', text: text, extra: panel, noHost: true,
+    choices: [{ label: appointed ? '군사 바꾸기' : '군사 임명', value: 'appoint' }, { label: '닫기', value: true, cls: 'primary' }], auto: true, onOpen: function (box, close) { closeFn = close; } })
+    .then(async function (v) { if (v === 'appoint' && await SG.UI.appointStrategist()) return SG.UI.briefing(true); });
 };

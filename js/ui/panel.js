@@ -272,6 +272,7 @@ SG.UI.officerCard = function (oid) {
         h('div', { class: 'ocard-name' }, [o.n, h('span', { text: o.h + (o.za ? ' · 자 ' + o.za : '') })]),
         h('div', { class: 'oc-chips' }, [
           h('span', { class: 'chip-b first', text: isLord ? '군주' : role }),
+          F && SG.strategist(so.f) === oid ? h('span', { class: 'chip-b strat', text: '軍師 군사' }) : null,
           h('span', { class: 'chip-b', text: status }),
           h('span', { class: 'chip-b', text: SG.age(oid) + '세 (' + SG.born(oid) + '년생)' }),
           so.s === 'force' && !isLord ? h('span', { class: 'chip-b', text: '충성 ' + so.loy }) : null,

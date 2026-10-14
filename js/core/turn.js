@@ -17,6 +17,34 @@ SG.govRate = function (cid) {
   var g = SG.governor(cid);
   return g ? 1 + (SG.O(g).pol - 60) / 400 : 0.9;
 };
+// 군사(軍師): 세력의 책사. 임명한 장수(f.strat)가 없으면 군주를 뺀 장수 중 지력이 가장 높은 이
+SG.strategist = function (fid) {
+  var S = SG.S, f = S.forces[fid];
+  if (!f) return null;
+  var s = f.strat, so = s && S.off[s];
+  if (so && so.s === 'force' && so.f === fid && s !== f.lord) return s;
+  return null;
+};
+SG.advisorOf = function (fid) {
+  var S = SG.S, f = S.forces[fid];
+  if (!f) return null;
+  var s = SG.strategist(fid);
+  if (s) return s;
+  var offs = SG.officersOf(fid).filter(function (o) { return o !== f.lord; });
+  return (offs.length ? offs : [f.lord]).sort(function (a, b) { return SG.O(b).int - SG.O(a).int; })[0];
+};
+SG.appointStrategist = function (fid, oid) {
+  var S = SG.S, f = S.forces[fid], t = S.off[oid];
+  if (!f || !t || t.s !== 'force' || t.f !== fid) return { ok: false, msg: '우리 세력 장수만 군사로 임명할 수 있습니다' };
+  if (oid === f.lord) return { ok: false, msg: '군주는 군사를 겸할 수 없습니다' };
+  var was = SG.strategist(fid), g = 0;
+  f.strat = oid;
+  if (was !== oid) { g = Math.min(5, 100 - t.loy); t.loy += g; }
+  var msg = SG.name(oid) + '을(를) 군사로 임명했다.' + (g ? ' 충성 +' + g : '');
+  SG.log(fid, msg, 'staff');
+  return { ok: true, msg: SG.josa(msg) };
+};
+
 // 태수 임명 (명령 횟수는 쓰지 않는다)
 SG.cmd = SG.cmd || {};
 SG.appoint = function (cid, oid) {

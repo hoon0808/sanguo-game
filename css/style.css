@@ -466,7 +466,7 @@ table.t tr.dim td { opacity: .45; }
 .oc-sk { font-size: 10.5px; color: var(--accent); }
 .pick-cards { max-height: 60vh; overflow-y: auto; padding: 2px 2px 6px; }
 
-/* 참모 */
+/* 군사 */
 .advisor { position: absolute; right: 12px; bottom: 12px; width: 400px; max-width: calc(100% - 24px); display: flex; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 10px 28px var(--shadow); z-index: 4; animation: rise .25s ease-out; }
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
 .adv-body { flex: 1; min-width: 0; }
@@ -1173,7 +1173,7 @@ kbd { display: inline-block; min-width: 92px; text-align: center; padding: 2px 8
 .snd-btn:not(.on) { color: var(--bad); }
 .title-snd { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
 
-/* 참모 보고 */
+/* 군사 보고 */
 .k-advisor .visitor { left: 27%; }
 .brief-list { position: absolute; right: 9%; top: 70px; width: 46%; max-height: calc(100% - 220px); display: flex; flex-direction: column; background: linear-gradient(180deg, #f7f0dc, #eadfbf); color: #2a1f12; border: 1px solid var(--brz); border-radius: 4px; box-shadow: 0 0 0 3px rgba(42, 23, 12, .7), 0 18px 36px rgba(0, 0, 0, .55); z-index: 2; animation: unfurl .4s ease-out both .1s; }
 .bl-h { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-family: var(--f-display); font-size: 18px; border-bottom: 1px solid rgba(176, 138, 62, .6); }
@@ -1557,3 +1557,6 @@ html.compact .bt-sup { margin-left: 4px; font-size: 11px; }
 html.compact .bt-sup > span { padding: 2px 6px 2px 3px; }
 
 .bt-sup.bt-sup-side { display: none; }
+/* 군사 */
+.bl-h .bl-adv { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--brz); white-space: nowrap; }
+.chip-b.strat { background: #2c5a7a; color: #e8f2fa; border-color: #2c5a7a; }

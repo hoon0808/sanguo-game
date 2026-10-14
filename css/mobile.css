@@ -260,7 +260,7 @@ html.compact #toast-root { top: 40px; max-width: 72vw; }
 html.compact .toast { font-size: 12px; padding: 6px 14px; line-height: 1.4; }
 
 /* ===== 세로 화면 (html.portrait): 위에 지도, 아래에 도시 장부·명령판 ===== */
-/* 위쪽 막대: 두 줄 (날짜·자원 / 참모·소리·메뉴·턴 종료) */
+/* 위쪽 막대: 두 줄 (날짜·자원 / 군사·소리·메뉴·턴 종료) */
 html.portrait .game { grid-template-rows: auto 1fr; }
 html.portrait .topbar { flex-wrap: wrap; row-gap: 4px; padding: 4px 6px; overflow: visible; position: relative; z-index: 8; }
 html.portrait .topbar .date { flex: none; }

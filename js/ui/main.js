@@ -42,7 +42,7 @@ SG.UI.refresh = function () {
   SG.UI.renderAdvisor();
 };
 
-// ---- 참모의 조언: 매달 상황을 살펴 한마디씩
+// ---- 군사의 조언: 매달 상황을 살펴 한마디씩
 SG.UI.advice = function () {
   var S = SG.S, fid = S.player, out = [];
   if (!fid || !S.forces[fid] || !S.forces[fid].alive) return out;
@@ -67,10 +67,41 @@ SG.UI.advice = function () {
   });
   var idle = cities.filter(function (c) { return !S.cities[c].deleg; }).reduce(function (s, c) { return s + SG.readyOfficers(c).length; }, 0);
   if (idle) out.push({ city: null, w: 1, t: '아직 명령을 받지 않은 장수가 ' + idle + '명 있습니다.' });
+  // 군사의 지력이 높을수록 더 깊이 살핀다
+  var adv = SG.advisorOf(fid), ai = adv ? SG.O(adv).int : 50;
+  if (ai >= 85) {
+    // 적 장수의 약점: 우리와 맞닿은 적 도시에서 충성이 낮은 장수 (등용·매수 기회)
+    var seen = {};
+    cities.forEach(function (cid) {
+      SG.ADJ[cid].forEach(function (n) {
+        var t = S.cities[n]; if (!t.owner || t.owner === fid || seen[n]) return; seen[n] = true;
+        SG.officersIn(n, t.owner).forEach(function (o) {
+          if (S.off[o].loy < 55 && S.forces[t.owner].lord !== o) out.push({ city: n, w: 3, t: SG.cityName(n) + '의 ' + SG.name(o) + '(' + SG.forceName(t.owner) + ')은(는) 충성이 ' + S.off[o].loy + '뿐입니다. 등용하거나 싸움터에서 금으로 매수할 수 있겠습니다.' });
+        });
+      });
+    });
+    // 숨은 보물 소문: 우리 땅과 이웃에
+    if (SG.hiddenItems) cities.concat(Object.keys(seen)).forEach(function (cid) {
+      var hid = SG.hiddenItems(cid);
+      if (hid.length) out.push({ city: cid, w: 3, t: SG.cityName(cid) + ' 어딘가에 ' + SG.ITEM_KIND[SG.ITEMS[hid[0]].k] + '이(가) 숨어 있다는 소문이 있습니다. 그곳에서 「인재 탐색」을 해 보십시오.' });
+    });
+  }
+  if (ai >= 90) {
+    // 침공 낌새: 이웃 적 도시의 병력이 우리 도시보다 크게 많으면
+    cities.forEach(function (cid) {
+      var c = S.cities[cid];
+      SG.ADJ[cid].forEach(function (n) {
+        var t = S.cities[n];
+        if (t.owner && t.owner !== fid && !SG.isAlly(fid, t.owner) && t.soldiers > c.soldiers * 1.5 && SG.officersIn(n, t.owner).length >= 2)
+          out.push({ city: cid, w: 8, t: SG.forceName(t.owner) + ' 세력이 ' + SG.cityName(n) + '에 병사 ' + SG.fmt(t.soldiers) + '을(를) 모으고 있습니다. ' + SG.cityName(cid) + '을(를) 노리는 듯하니 대비하십시오.' });
+      });
+    });
+  }
   out.sort(function (a, b) { return b.w - a.w; });
-  return out;
+  // 지력이 낮은 군사는 큰일 몇 가지만 아뢴다
+  return out.slice(0, ai >= 90 ? 10 : ai >= 80 ? 7 : ai >= 65 ? 5 : 3);
 };
-// 참모의 말은 이제 달마다 「참모 보고」 장면으로 보여 준다 (js/ui/visit.js SG.UI.briefing). 예전 고정 상자는 지운다.
+// 군사의 말은 이제 달마다 「군사 보고」 장면으로 보여 준다 (js/ui/visit.js SG.UI.briefing). 예전 고정 상자는 지운다.
 SG.UI.renderAdvisor = function () {
   var box = document.getElementById('advisor');
   if (box) box.remove();
@@ -107,9 +138,10 @@ SG.UI.renderTop = function () {
     ['지도 전체 보기', function () { SG.UI.state.map.fit(); }],
     [SG.UI.themeLabel(), function () { SG.UI.cycleTheme(); }],
     ['소리 설정', SG.UI.soundSettings],
+    ['군사 임명', function () { SG.UI.appointStrategist(); }],
     ['난이도: ' + SG.DIFFS[SG.diffKey()].n + ' (바꾸기)', SG.UI.changeDiff],
     [SG.UI.scenesOn() ? '명령 장면: 보기 (끄기)' : '명령 장면: 꺼짐 (켜기)', function () { SG.UI.setScenes(!SG.UI.scenesOn()); SG.UI.toast(SG.UI.scenesOn() ? '명령마다 장면을 봅니다' : '명령 장면을 끕니다. 결과는 가운데에 잠깐 보입니다'); SG.UI.refresh(); }],
-    [SG.UI.briefOn() ? '참모 보고: 매달 보기 (끄기)' : '참모 보고: 꺼짐 (켜기)', function () { SG.UI.setBrief(!SG.UI.briefOn()); SG.UI.toast(SG.UI.briefOn() ? '달마다 참모 보고를 봅니다' : '참모 보고를 끕니다. 위쪽 「참모」로 언제든 볼 수 있습니다'); SG.UI.refresh(); }],
+    [SG.UI.briefOn() ? '군사 보고: 매달 보기 (끄기)' : '군사 보고: 꺼짐 (켜기)', function () { SG.UI.setBrief(!SG.UI.briefOn()); SG.UI.toast(SG.UI.briefOn() ? '달마다 군사 보고를 봅니다' : '군사 보고를 끕니다. 위쪽 「군사」로 언제든 볼 수 있습니다'); SG.UI.refresh(); }],
     ['도움말', SG.UI.help],
     ['타이틀로', async function () {
       if (await SG.UI.confirm('타이틀로', '타이틀 화면으로 돌아갈까요?\n매달 자동 저장되므로 「이어하기」로 돌아올 수 있습니다.')) SG.UI.title();
@@ -122,7 +154,7 @@ SG.UI.renderTop = function () {
     h('button', { class: 'btn small icon-btn pc-only', onclick: SG.UI.officerList }, [SG.UI.icon('officer', 16), '장수 일람']),
     h('button', { class: 'btn small icon-btn pc-only', onclick: SG.UI.forceList }, [SG.UI.icon('flag', 16), '세력 일람']),
     h('button', { class: 'btn small icon-btn pc-only', onclick: function () { SG.UI.saveLoad('save'); } }, [SG.UI.icon('save', 16), '저장']),
-    S.player && S.forces[S.player].alive ? h('button', { class: 'btn small icon-btn adv-btn', type: 'button', title: '참모 보고 다시 보기', onclick: function () { SG.UI.briefing(true); } }, [SG.UI.icon('scroll', 16), '참모']) : null,
+    S.player && S.forces[S.player].alive ? h('button', { class: 'btn small icon-btn adv-btn', type: 'button', title: '군사 보고 다시 보기', onclick: function () { SG.UI.briefing(true); } }, [SG.UI.icon('scroll', 16), '군사']) : null,
     SG.UI.soundBtn(true),
     h('div', { class: 'dd-wrap' }, [h('button', { class: 'btn small icon-btn', id: 'menu-btn', onclick: function (e) { e.stopPropagation(); dd.hidden = !dd.hidden; } }, [SG.UI.icon('menu', 16), '메뉴']), dd]),
     h('button', { class: 'btn primary end-turn', id: 'end-turn', title: '다음 달로 (Enter)', onclick: SG.UI.endTurn }, ['턴 종료', SG.UI.icon('next', 18)])

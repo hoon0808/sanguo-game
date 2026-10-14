@@ -387,6 +387,9 @@ SG.T.stratTargets = function (B, u) {
 };
 SG.T.stratChance = function (B, u, t, kind) {
   var p = 0.5 + (u.int - t.int) / 90;
+  // 우리 군사가 이 싸움에 나와 있으면 계략이 더 잘 먹힌다 (+8%)
+  var fid = u.side === 'atk' ? B.atk.fid : B.def.fid, st = SG.strategist && SG.strategist(fid);
+  if (st && SG.T.alive(B, u.side).some(function (x) { return x.oid === st; })) p += 0.08;
   if (u.sk === '신산') p += 0.15;
   if (kind === 'fire' && B.map[SG.T.key(t.c, t.r)] === 'water') p -= 0.3;
   if (kind === 'fire' && B.map[SG.T.key(t.c, t.r)] === 'forest') p += 0.1;

@@ -312,7 +312,7 @@ SG.UI.Map.prototype.drawTerritory = function () {
   this.terr.setAttribute('href', cv.toDataURL('image/png'));
 };
 
-// 나침반 (오른쪽 아래가 아니라 왼쪽 아래 — 오른쪽 아래는 참모 자리)
+// 나침반 (오른쪽 아래가 아니라 왼쪽 아래 — 오른쪽 아래는 군사 자리)
 SG.UI.COMPASS = '<svg viewBox="-50 -50 100 100" width="92" height="92" aria-hidden="true">' +
   '<circle r="34" class="cp-ring"/><circle r="29" class="cp-ring2"/>' +
   '<g class="cp-tick">' + [0, 45, 90, 135, 180, 225, 270, 315].map(function (a) { return '<line x1="0" y1="-29" x2="0" y2="-34" transform="rotate(' + a + ')"/>'; }).join('') + '</g>' +

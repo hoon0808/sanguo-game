@@ -204,11 +204,38 @@ SG.cmd.reward = function (cid, target, gold) {
   return { ok: true, msg: msg, gain: g };
 };
 
-// ---- 이동: 장수가 병사·금·식량을 가지고 이웃 우리 도시로 옮겨 가 그곳에 머문다
+// ---- 길: 우리 땅으로 이어진 가장 짧은 길 (다른 세력 땅은 지나갈 수 없다). 한 도시 건널 때마다 한 달
+SG.routeOwn = function (fid, from, to) {
+  if (from === to || !SG.S.cities[to] || SG.S.cities[to].owner !== fid) return null;
+  var prev = {}, q = [from];
+  prev[from] = from;
+  while (q.length) {
+    var x = q.shift();
+    if (x === to) break;
+    SG.ADJ[x].forEach(function (n) { if (!(n in prev) && SG.S.cities[n].owner === fid) { prev[n] = x; q.push(n); } });
+  }
+  if (!(to in prev)) return null;
+  var path = [to];
+  while (path[0] !== from) path.unshift(prev[path[0]]);
+  return path;
+};
+SG.travelMonths = function (fid, from, to) { var p = SG.routeOwn(fid, from, to); return p ? p.length - 1 : 0; };
+// 갈 수 있는 우리 도시 (가까운 순)
+SG.reachableOwn = function (cid) {
+  var fid = SG.S.cities[cid].owner;
+  return SG.citiesOf(fid).filter(function (d) { return d !== cid && SG.routeOwn(fid, cid, d); })
+    .sort(function (a, b) { return SG.travelMonths(fid, cid, a) - SG.travelMonths(fid, cid, b) || SG.cityName(a).localeCompare(SG.cityName(b)); });
+};
+SG.monthNow = function () { return SG.S.year * 12 + SG.S.month; };
+SG.etaText = function (m) { return m <= 1 ? '다음 달에' : m + '달 뒤에'; };
+
+// ---- 이동: 장수가 병사·금·식량을 가지고 우리 도시로 옮겨 가 그곳에 머문다 (멀수록 오래 걸림)
 SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   var c = SG.S.cities[cid], d = SG.S.cities[dest];
-  if (!d || SG.ADJ[cid].indexOf(dest) < 0) return fail('붙어 있는 도시로만 이동할 수 있습니다');
-  if (d.owner !== c.owner) return fail('우리 도시로만 이동할 수 있습니다');
+  if (!d || d.owner !== c.owner) return fail('우리 도시로만 이동할 수 있습니다');
+  var route = SG.routeOwn(c.owner, cid, dest);
+  if (!route) return fail('우리 땅으로 이어진 도시로만 이동할 수 있습니다');
+  var months = route.length - 1;
   oids = oids || [];
   if (!oids.length) return fail('이동할 장수를 한 명 이상 고르세요');
   for (var i = 0; i < oids.length; i++) if (!SG.ready(cid, oids[i])) return fail('명령할 수 없는 장수가 있습니다');
@@ -217,18 +244,18 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   soldiers = SG.mixTotal(mix);
   gold = SG.clamp(Math.floor(gold || 0), 0, c.gold);
   food = SG.clamp(Math.floor(food || 0), 0, c.food);
-  // 장수·병사·금·식량은 길을 가는 동안 어느 도시에도 없다가 다음 달에 도착한다 (SG.deliverMarches). 병종 구성도 그대로 간다
+  // 장수·병사·금·식량은 길을 가는 동안 어느 도시에도 없다가 months 달 뒤에 도착한다 (SG.deliverMarches). 병종 구성도 그대로 간다
   SG.takeTroops(c, mix, cid);
   c.gold -= gold; c.food -= food;
   oids.forEach(function (o) { SG.S.off[o].march = dest; SG.S.off[o].acted = true; });
-  (SG.S.marches = SG.S.marches || []).push({ from: cid, to: dest, fid: c.owner, oids: oids.slice(), mix: mix, n: soldiers, train: c.train, morale: c.morale, gold: gold, food: food });
+  (SG.S.marches = SG.S.marches || []).push({ from: cid, to: dest, fid: c.owner, oids: oids.slice(), mix: mix, n: soldiers, train: c.train, morale: c.morale, gold: gold, food: food, arrive: SG.monthNow() + months, months: months });
   var extra = [];
   if (soldiers) extra.push('병사 ' + SG.fmt(soldiers));
   if (gold) extra.push('금 ' + SG.fmt(gold));
   if (food) extra.push('식량 ' + SG.fmt(food));
-  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 떠났다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '. 다음 달에 도착한다.';
+  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 떠났다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '. ' + SG.etaText(months) + ' 도착한다.';
   if (SG.cmdLog) SG.cmdLog.push({ oid: oids[0], msg: SG.josa(msg), ok: true });
-  return { ok: true, msg: msg };
+  return { ok: true, msg: msg, months: months };
 };
 
 // ---- 수송: cid 의 장수 oid 가 이웃 우리 도시 src → dest 로 금·식량을 실어 나르고 돌아온다 (장수는 제자리, 이번 달 행동 끝).
@@ -236,7 +263,12 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
 SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   var a = SG.S.cities[src], b = SG.S.cities[dest];
   if (src !== cid && dest !== cid) return fail('이 도시와 이웃 도시 사이만 옮길 수 있습니다');
-  if (SG.ADJ[src].indexOf(dest) < 0 || a.owner !== b.owner || a.owner !== SG.S.cities[cid].owner) return fail('붙어 있는 우리 도시끼리만 옮길 수 있습니다');
+  if (!a || !b || a.owner !== b.owner || a.owner !== SG.S.cities[cid].owner) return fail('우리 도시끼리만 옮길 수 있습니다');
+  // 금·식량은 우리 땅으로 이어진 곳이면 멀리도 보낼 수 있다 (한 도시 건널 때마다 한 달). 병사를 데려오는 것은 붙은 도시만
+  var route = SG.routeOwn(a.owner, src, dest);
+  if (!route) return fail('우리 땅으로 이어진 도시로만 보낼 수 있습니다');
+  if (soldiers > 0 && route.length > 2) return fail('병사는 붙어 있는 도시에서만 데려올 수 있습니다');
+  var months = route.length - 1;
   if (!SG.ready(cid, oid)) return fail('명령할 수 없는 장수입니다');
   soldiers = SG.clamp(Math.floor(soldiers || 0), 0, a.soldiers);
   food = SG.clamp(Math.floor(food || 0), 0, a.food);
@@ -250,23 +282,24 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   SG.takeTroops(a, mix, src); SG.putTroops(b, mix, dest);
   // 금·식량은 수레에 실려 길을 가므로 다음 달(턴이 지난 뒤)에 도착한다
   a.food -= food; a.gold -= gold;
-  if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food);
+  if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food, months);
   var goods = [gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
   var what = [soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')' : '', goods].filter(Boolean).join('·');
   // 병사는 장수가 이끈다: 데려올 때는 장수가 그 도시에 가서 병사를 이끌고 돌아온다
-  var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보냈다. 다음 달에 도착한다.'
-    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) 다음 달에 도착한다.' : '')
-    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + goods + '을(를) 실어 오게 했다. 다음 달에 도착한다.';
-  return done(oid, msg, { moved: soldiers, src: src, dest: dest, convoy: (food || gold) ? { gold: gold, food: food } : null });
+  var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보냈다. ' + SG.etaText(months) + ' 도착한다.'
+    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) ' + SG.etaText(months) + ' 도착한다.' : '')
+    : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + goods + '을(를) 실어 오게 했다. ' + SG.etaText(months) + ' 도착한다.';
+  return done(oid, msg, { moved: soldiers, src: src, dest: dest, convoy: (food || gold) ? { gold: gold, food: food } : null, months: months });
 };
 
 // ---- 행군 (이동한 장수·병사·물자가 길 위에 있는 동안)
 SG.marchesTo = function (cid) { return (SG.S.marches || []).filter(function (v) { return v.to === cid; }); };
 // 달이 바뀔 때 도착. 받을 도시를 잃었으면 떠난 도시로, 둘 다 잃었으면 가장 가까운 우리 도시로 (그것도 없으면 장수는 재야로, 병사는 흩어짐)
 SG.deliverMarches = function () {
-  var S = SG.S, list = S.marches || [];
-  S.marches = [];
-  list.forEach(function (v) {
+  var S = SG.S, list = S.marches || [], now = SG.monthNow();
+  // 아직 길 위에 있는 행군은 남겨 둔다 (예전 저장 파일은 arrive 가 없으므로 바로 도착)
+  S.marches = list.filter(function (v) { return v.arrive > now; });
+  list.filter(function (v) { return !(v.arrive > now); }).forEach(function (v) {
     var alive = S.forces[v.fid] && S.forces[v.fid].alive;
     var dest = !alive ? null : S.cities[v.to].owner === v.fid ? v.to : S.cities[v.from].owner === v.fid ? v.from : SG.nearestOwn(v.fid, v.to);
     var who = v.oids.filter(function (o) { var x = S.off[o]; return x && x.march && x.s === 'force' && x.f === v.fid; });
@@ -296,18 +329,19 @@ SG.deliverMarches = function () {
 };
 
 // ---- 수레 (금·식량이 길 위에 있는 동안)
-SG.addConvoy = function (from, to, fid, gold, food) {
+SG.addConvoy = function (from, to, fid, gold, food, months) {
   var S = SG.S;
-  (S.convoys = S.convoys || []).push({ from: from, to: to, fid: fid, gold: gold || 0, food: food || 0 });
+  months = months || 1;
+  (S.convoys = S.convoys || []).push({ from: from, to: to, fid: fid, gold: gold || 0, food: food || 0, arrive: SG.monthNow() + months, months: months });
 };
 SG.convoysTo = function (cid) {
   return (SG.S.convoys || []).filter(function (v) { return v.to === cid; });
 };
 // 달이 바뀔 때 도착. 받을 도시를 빼앗겼으면 보낸 도시로 되돌아가고, 둘 다 잃었으면 사라진다
 SG.deliverConvoys = function () {
-  var S = SG.S, list = S.convoys || [];
-  S.convoys = [];
-  list.forEach(function (v) {
+  var S = SG.S, list = S.convoys || [], now = SG.monthNow();
+  S.convoys = list.filter(function (v) { return v.arrive > now; });
+  list.filter(function (v) { return !(v.arrive > now); }).forEach(function (v) {
     var to = S.cities[v.to], from = S.cities[v.from];
     var dest = to && to.owner === v.fid ? v.to : from && from.owner === v.fid ? v.from : null;
     var what = [v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join('·');

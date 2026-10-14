@@ -1576,3 +1576,9 @@ html.compact .bt-sup > span { padding: 2px 6px 2px 3px; }
 .prebattle.good .pb-line { border-left-color: var(--accent); }
 .prebattle.bad .pb-line { border-left-color: var(--seal); }
 html.compact .prebattle .pb-img { height: 90px; }
+
+/* 이동·수송 목적지 (먼 곳은 달 수와 길) */
+.dest-wrap { flex: 1; min-width: 0; }
+.dest-wrap select.inp { width: 100% !important; max-width: 360px; }
+.dest-wrap .route-note { margin: 4px 0 0; font-size: 13px; }
+.dest-wrap .route-note:empty { display: none; }

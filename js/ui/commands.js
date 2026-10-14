@@ -384,19 +384,19 @@ SG.UI.troopSliders = function (cid) {
 
 SG.UI.cmdMove = async function (cid) {
   var S = SG.S, c = S.cities[cid];
-  var dests = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === c.owner; });
-  if (!dests.length) { SG.UI.toast('붙어 있는 우리 도시가 없습니다', true); return; }
+  var dests = SG.reachableOwn(cid);
+  if (!dests.length) { SG.UI.toast('갈 수 있는 우리 도시가 없습니다', true); return; }
   var ready = SG.readyOfficers(cid);
   if (!ready.length) { SG.UI.toast('이번 달에 명령할 수 있는 장수가 없습니다', true); return; }
   var picked = [];
-  var sel = SG.UI.destSelect(dests);
+  var sel = SG.UI.destSelect(dests, cid);
   var tbl = SG.UI.officerCards(ready, { selected: picked, onPick: function (o, card) {
     var i = picked.indexOf(o); if (i >= 0) picked.splice(i, 1); else picked.push(o);
     card.classList.toggle('sel', picked.indexOf(o) >= 0);
   } });
   var sS = SG.UI.troopSliders(cid), sG = SG.UI.slider('가져갈 금', c.gold, 0), sF = SG.UI.slider('가져갈 식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 길을 가는 동안이라 다음 달(턴 종료 뒤)에 도착합니다 · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
+    SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 우리 땅으로 이어진 곳이면 멀리도 갈 수 있고, 도시 하나 건널 때마다 한 달 걸립니다 (붙은 도시는 다음 달 도착) · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
     h('div', { class: 'field' }, [h('label', { text: '목적지' }), sel]),
     sS, sG, sF,
     h('p', { class: 'note', text: '옮겨 갈 장수를 고르세요 (여러 명 가능).' }),
@@ -409,29 +409,41 @@ SG.UI.cmdMove = async function (cid) {
   var dest = sel.value, ns = sS.get(), ng = sG.get(), nf = sF.get();
   await SG.UI.doCmd({ kind: 'move', cid: cid, oid: picked[0], offs: picked.slice(), cities: [cid, dest], target: dest, run: function () { return SG.cmd.move(cid, picked, dest, ns, ng, nf); } });
 };
-// 목적지 고르기 (이웃 우리 도시)
-SG.UI.destSelect = function (dests) {
+// 목적지 고르기 (우리 땅으로 이어진 도시, 가까운 순). from 이 있으면 걸리는 달 수와 지나는 길을 함께 보인다
+SG.UI.destSelect = function (dests, from) {
   var S = SG.S;
-  return h('select', { class: 'inp', style: { width: '220px', maxWidth: '100%' } }, dests.map(function (d) {
-    var t = S.cities[d];
-    return h('option', { value: d, text: SG.cityName(d) + ' (병사 ' + SG.fmt(t.soldiers) + ' · 금 ' + SG.fmt(t.gold) + ' · 식량 ' + SG.fmt(t.food) + (SG.threat(d).front ? ' · 전방' : '') + ')' });
+  var sel = h('select', { class: 'inp', style: { width: '320px', maxWidth: '100%' } }, dests.map(function (d) {
+    var t = S.cities[d], m = from ? SG.travelMonths(S.cities[from].owner, from, d) : 1;
+    return h('option', { value: d, text: SG.cityName(d) + (from ? ' — ' + (m <= 1 ? '다음 달 도착' : m + '달') : '') + ' (병사 ' + SG.fmt(t.soldiers) + ' · 금 ' + SG.fmt(t.gold) + ' · 식량 ' + SG.fmt(t.food) + (SG.threat(d).front ? ' · 전방' : '') + ')' });
   }));
+  if (!from) return sel;
+  // 지나는 길 (2달 이상일 때)
+  var route = h('div', { class: 'route-note note' });
+  function upd() {
+    var p = SG.routeOwn(S.cities[from].owner, from, sel.value);
+    route.textContent = p && p.length > 2 ? '길: ' + p.map(SG.cityName).join(' → ') + ' (' + (p.length - 1) + '달)' : '';
+  }
+  sel.addEventListener('change', upd); upd();
+  var wrap = h('div', { class: 'dest-wrap' }, [sel, route]);
+  wrap.sel = sel;
+  Object.defineProperty(wrap, 'value', { get: function () { return sel.value; } });
+  return wrap;
 };
 // 수송: 장수 한 명이 금·식량을 실어 보내고 돌아온다 (병사는 「이동」으로 장수가 데려간다)
 SG.UI.cmdTransport = async function (cid) {
   var S = SG.S, c = S.cities[cid];
-  var dests = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === c.owner; });
-  if (!dests.length) { SG.UI.toast('붙어 있는 우리 도시가 없습니다', true); return; }
+  var dests = SG.reachableOwn(cid);
+  if (!dests.length) { SG.UI.toast('보낼 수 있는 우리 도시가 없습니다', true); return; }
   var ready = SG.readyOfficers(cid);
   if (!ready.length) { SG.UI.toast('이번 달에 명령할 수 있는 장수가 없습니다', true); return; }
   var picked = null, cards = [];
-  var sel = SG.UI.destSelect(dests);
+  var sel = SG.UI.destSelect(dests, cid);
   var tbl = SG.UI.officerCards(ready, { onPick: function (o, card) {
     picked = o; [].forEach.call(tbl.querySelectorAll('.ocard'), function (x) { x.classList.remove('sel'); }); card.classList.add('sel');
   } });
   var sG = SG.UI.slider('금', c.gold, 0), sF = SG.UI.slider('식량', c.food, 0);
   var body = h('div', null, [
-    SG.UI.brief('장수가 금·식량을 수레에 싣고 갔다가 돌아옵니다 · 길을 가는 동안이라 다음 달(턴 종료 뒤)에 도착합니다 · 장수는 이 도시에 그대로 남습니다 · 병사는 「인사 → 이동」'),
+    SG.UI.brief('장수가 금·식량을 수레에 실어 보내고 돌아옵니다 · 우리 땅으로 이어진 곳이면 멀리도 보낼 수 있고, 도시 하나 건널 때마다 한 달 걸립니다 (붙은 도시는 다음 달 도착) · 장수는 이 도시에 그대로 남습니다 · 병사는 「인사 → 이동」'),
     h('div', { class: 'field' }, [h('label', { text: '보낼 곳' }), sel]),
     sG, sF,
     h('p', { class: 'note', text: '수레를 몰 장수 한 명을 고르세요 (이번 달 명령을 씁니다).' }),

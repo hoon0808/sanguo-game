@@ -5,7 +5,7 @@ var SG = SG || {};
 SG.DIFF_KEYS = ['easy', 'normal', 'hard', 'hell'];
 SG.DIFFS = {
   easy: { n: '쉬움', h: '易', d: '컴퓨터가 덤 없이 신중하게 움직입니다. 처음 해 보는 분께.',
-    inc: 1, start: 1, army: 1, power: 1, need: 0, hunt: 0.95, recruit: 1, loyDrop: 0, scheme: 0.3 },
+    inc: 1, start: 1, army: 1, power: 1, need: 0, hunt: 0.95, recruit: 1, loyDrop: 0, scheme: 0 },
   normal: { n: '보통', h: '常', d: '컴퓨터 수입 +20%·시작 물자 +15%·전투력 +5%. 더 과감하게 공격하고 우리를 노립니다.',
     inc: 1.2, start: 1.15, army: 1.15, power: 1.05, need: -0.1, hunt: 1.1, recruit: 0.9, loyDrop: 0, scheme: 0.3 },
   hard: { n: '어려움', h: '難', d: '컴퓨터 수입 +45%·시작 물자 +35%·전투력 +12%. 적 장수를 데려오기 어렵고, 우리 장수 충성이 조금씩 떨어집니다.',

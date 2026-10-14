@@ -16,13 +16,14 @@ SG.UI.governor = function (cid) { return SG.governor(cid); };
 // 태수 임명 창
 SG.UI.appointGov = async function (cid) {
   var S = SG.S, c = S.cities[cid], offs = SG.officersIn(cid, c.owner), pick = null, cur = SG.governor(cid);
+  if (offs.length < 2) { SG.UI.toast(offs.length ? SG.josa(SG.name(offs[0]) + '이(가) 홀로 이 도시를 맡고 있습니다 — 장수가 둘 이상일 때 고를 수 있습니다') : '이 도시에 장수가 없습니다', true); return; }
   var body = h('div', null, [
-    h('p', { class: 'note', text: '태수의 정치가 높을수록 금 수입·가을걷이가 늘고(정치 60 기준, 100 이면 +10%, 20 이면 −10%), 매력이 80 이상이면 민심이 달마다 1씩 오릅니다. 위임하면 태수가 이 도시를 맡아 다스립니다. 새로 임명된 장수는 충성 +5. 명령 횟수는 쓰지 않습니다.' }),
+    h('p', { class: 'note', text: '태수의 정치가 높을수록 금 수입·가을걷이가 늘고(정치 60 기준, 100 이면 +10%, 20 이면 −10%), 매력이 80 이상이면 민심이 달마다 1씩 오릅니다. 위임하면 태수가 이 도시를 맡아 다스립니다. 새로 임명된 장수는 충성 +5. 군주가 머무는 도시도 태수를 둘 수 있고, 군주를 고르면 군주가 직접 다스립니다. 명령 횟수는 쓰지 않습니다.' }),
     h('div', { class: 'pick-list' }, [SG.UI.officerTable(offs, {
       sortBy: { get: function (o) { return SG.O(o).pol * 2 + SG.O(o).cha; } },
       cols: [{ label: '수입', cls: 'n', get: function (o) { var r = Math.round((SG.O(o).pol - 60) / 4); return (r >= 0 ? '+' : '') + r + '%'; } },
         { label: '민심', cls: 'n', get: function (o) { return SG.O(o).cha >= 80 ? '+1' : '·'; } },
-        { label: '지금', cls: 'n', get: function (o) { return o === cur ? '태수' : ''; } }],
+        { label: '지금', cls: 'n', get: function (o) { return o === cur ? (o === S.forces[c.owner].lord ? '군주' : '태수') : o === S.forces[c.owner].lord ? '군주' : ''; } }],
       onPick: function (o) { pick = o; var b = document.querySelector('#modal-root .back:last-child .modal-f .btn'); if (b) b.click(); }
     })])
   ]);
@@ -73,7 +74,7 @@ SG.UI.renderPanel = function (el, cid) {
 
   // ---- 태수 + 상태
   var gov = SG.UI.governor(cid), md = SG.UI.mood(c.loyal), th = c.owner ? SG.threat(cid) : null;
-  var canAppoint = mine && gov && gov !== f.lord && SG.officersIn(cid, c.owner).length > 1;
+  var canAppoint = mine && gov && SG.officersIn(cid, c.owner).length > 1;
   var gr = gov ? Math.round((SG.govRate(cid) - 1) * 100) : 0;
   var govRow = h('div', { class: 'gov' }, [
     gov ? SG.UI.portrait(gov, 64) : h('span', { class: 'pt gov-empty', style: { width: '64px', height: '64px', background: '#66706b', fontSize: '28px' } }, ['空']),

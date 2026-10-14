@@ -19,7 +19,8 @@ SG.UI.CMD_GROUPS = [
     { label: '인재 탐색', run: function (cid) { return SG.UI.cmdSearch(cid); } },
     { label: '등용', run: function (cid) { return SG.UI.cmdRecruit(cid); } },
     { label: '포상', run: function (cid) { return SG.UI.cmdReward(cid); } },
-    { label: '이동', run: function (cid) { return SG.UI.cmdMove(cid); } }
+    { label: '이동', run: function (cid) { return SG.UI.cmdMove(cid); } },
+    { label: '태수 임명', run: function (cid) { return SG.UI.appointGov(cid); } }
   ] }
 ];
 
@@ -27,7 +28,7 @@ SG.UI.CMD_GROUPS = [
 SG.UI.CMD_META = {
   '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'], '교역': ['trade', '금 ↔ 식량'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
-  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금·보물'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'],
+  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금·보물'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'], '태수 임명': ['officer', '정치·매력 · 횟수 안 씀'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
   '친선': ['gift', '금 300 · 매력'], '동맹': ['ally', '매력'], '항복 권고': ['surrender', '매력']
 };

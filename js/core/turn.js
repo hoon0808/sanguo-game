@@ -8,8 +8,9 @@ SG.governor = function (cid) {
   var offs = SG.officersIn(cid, c.owner);
   if (!offs.length) return null;
   var lord = SG.S.forces[c.owner].lord;
-  if (offs.indexOf(lord) >= 0) return lord;
+  // 임명한 태수가 있으면 군주가 머무는 도시라도 태수가 다스린다
   if (c.gov && offs.indexOf(c.gov) >= 0) return c.gov;
+  if (offs.indexOf(lord) >= 0) return lord;
   return offs.slice().sort(function (a, b) { return (SG.O(b).lead + SG.O(b).pol) - (SG.O(a).lead + SG.O(a).pol); })[0];
 };
 // 태수의 정치가 수입·수확을 늘리거나 줄인다 (정치 60 기준, 100 이면 +10%, 20 이면 −10%)
@@ -51,8 +52,14 @@ SG.appoint = function (cid, oid) {
   var c = SG.S.cities[cid], t = SG.S.off[oid];
   if (!c.owner || !t || t.s !== 'force' || t.f !== c.owner || t.c !== cid) return { ok: false, msg: '이 도시의 우리 장수만 태수로 임명할 수 있습니다' };
   var lord = SG.S.forces[c.owner].lord;
-  if (SG.officersIn(cid, c.owner).indexOf(lord) >= 0) return { ok: false, msg: '군주가 머무는 도시는 군주가 직접 다스립니다' };
   var was = SG.governor(cid), g = 0;
+  // 군주를 고르면 임명을 거두고 군주가 직접 다스린다
+  if (oid === lord) {
+    delete c.gov;
+    var m0 = SG.cityName(cid) + '은(는) 이제 ' + SG.name(lord) + '이(가) 직접 다스린다.';
+    SG.log(c.owner, m0, 'staff');
+    return { ok: true, msg: SG.josa(m0), gain: 0 };
+  }
   c.gov = oid;
   if (was !== oid && oid !== lord) { g = Math.min(5, 100 - t.loy); t.loy += g; }
   var msg = SG.name(oid) + '을(를) ' + SG.cityName(cid) + ' 태수로 임명했다.' + (g ? ' 충성 +' + g : '');

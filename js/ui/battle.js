@@ -291,7 +291,7 @@ SG.UI.tactical = function (atk, def) {
         slash(t); dustTrail(ff.from, ff.to); shake(false);
         if (ff.conf) setTimeout(function () { confuse(t); }, 300);
       } else { lunge(a, t); slash(t); if (form === 'combo') setTimeout(function () { SG.UI.sfx('clash'); lunge(a, t); slash(t); redraw(); }, 380); }
-      if (ff.kind === 'push') setTimeout(function () { flash(t, ff.ok ? '밀려남!' : '짓눌림!'); if (!ff.ok) shake(false); }, 250);
+      if (ff.kind === 'push') setTimeout(function () { flash(t, ff.ok ? '밀려남!' : ff.hold ? '버팀!' : '짓눌림!'); if (!ff.ok && !ff.hold) shake(false); }, 250);
       var lost = before - t.n;
       if (t.n <= 0) { setTimeout(function () { broken(t); }, ranged ? 420 : 150); SG.UI.sfx('broken'); }
       else if (lost > t.max * 0.12) shake(false);

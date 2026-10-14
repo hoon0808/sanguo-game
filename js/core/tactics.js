@@ -228,7 +228,7 @@ SG.T.FORMS = {
   pincer: { n: '협공', h: '挾', desc: '목표 옆에 아군이 있어야 합니다. 옆 아군 하나마다 피해 +20%, 반격은 −30%.' },
   // 병종 전법
   breach: { n: '돌파', h: '破', t: 'cav', desc: '기병만. 적 부대를 꿰뚫고 그 뒤 칸으로 빠져나갑니다 (뒤 칸이 비어 있어야 함). 피해 ×1.2, 반격은 ×0.6, 적이 흩어져 혼란에 빠질 수 있습니다.' },
-  push: { n: '밀어내기', h: '推', t: 'inf', desc: '보병만. 방패를 앞세워 적을 한 칸 밀어내고 그 자리로 들어갑니다. 밀려날 곳이 막혀 있으면 짓눌려 피해가 커집니다(×1.4). 병사가 많고 무력이 높을수록 잘 밀립니다.' },
+  push: { n: '밀어내기', h: '推', t: 'inf', desc: '보병만. 방패를 앞세워 적을 한 칸 밀어내고 그 자리로 들어갑니다. 밀려날 곳이 막혀 있으면 짓눌려 피해가 커집니다(×1.4). 병사가 많고 무력이 높을수록 잘 밀립니다. 성안(성문·성곽) 수비군은 좀처럼 밀리지 않고, 본성을 지키는 부대는 절대 밀리지 않습니다.' },
   firearrow: { n: '불화살', h: '火', t: 'arc', desc: '궁병만. 불화살을 쏩니다. 피해 ×0.75 이지만 불이 붙으면 더 타고(숲이면 잘 붙음, 물이면 안 붙음) 적이 하루 동안 혼란에 빠집니다. 지력이 높을수록 잘 붙습니다.' }
 };
 SG.T.FORM_KEYS = ['normal', 'charge', 'combo', 'volley', 'pincer', 'breach', 'push', 'firearrow'];
@@ -246,8 +246,17 @@ SG.T.canEnter = function (B, u, p) {
   if (tt === 'keep') return false; // 본성은 돌파·밀어내기로 뛰어들 수 없다
   return SG.T.moveCost(B, u, p[0], p[1]) < 99;
 };
-SG.T.pushChance = function (a, d) {
-  return SG.clamp(0.5 + 0.45 * (a.n - d.n) / Math.max(1, a.n + d.n) + (a.war - d.war) / 200 + (a.lead - d.lead) / 300, 0.15, 0.85);
+// 성안(성문·성곽)에서 버티는 수비군은 좀처럼 밀리지 않고, 본성을 지키는 부대는 절대 밀리지 않는다
+SG.T.pushGround = function (B, d) {
+  var tt = B && B.map[SG.T.key(d.c, d.r)];
+  if (d.side !== 'def') return 'open';
+  return tt === 'keep' ? 'keep' : tt === 'gate' || tt === 'castle' ? 'wall' : 'open';
+};
+SG.T.pushChance = function (a, d, B) {
+  var g = SG.T.pushGround(B, d);
+  if (g === 'keep') return 0;
+  var p = SG.clamp(0.5 + 0.45 * (a.n - d.n) / Math.max(1, a.n + d.n) + (a.war - d.war) / 200 + (a.lead - d.lead) / 300, 0.15, 0.85);
+  return g === 'wall' ? Math.min(0.12, p * 0.15) : p;
 };
 SG.T.fireChance = function (B, a, d) {
   var tt = B.map[SG.T.key(d.c, d.r)];
@@ -303,7 +312,7 @@ SG.T.bestForm = function (B, a, d) {
     var v = dealt - back * 0.8;
     if (f === 'firearrow') v += SG.T.fireChance(B, a, d) * (d.n * 0.06 + 200);
     if (f === 'breach') v += 150 + Math.min(d.n, 3000) * 0.04;
-    if (f === 'push') v += SG.T.pushChance(a, d) * 120 + (SG.T.canEnter(B, d, SG.T.beyond(a, d)) ? 0 : 0.4 * Math.min(d.n, SG.T.damage(B, a, d, 1, true)));
+    if (f === 'push') v += SG.T.pushChance(a, d, B) * 120 + (SG.T.pushGround(B, d) !== 'open' ? 0.1 : SG.T.canEnter(B, d, SG.T.beyond(a, d)) ? 0 : 0.4) * Math.min(d.n, SG.T.damage(B, a, d, 1, true));
     if (v > bv) { bv = v; best = f; }
   });
   return best;
@@ -337,12 +346,20 @@ SG.T.attack = function (B, a, d, form) {
   }
   if (form === 'push' && d.n > 0 && a.n > 0) {
     var pp = T.beyond(a, d), old = [d.c, d.r];
-    if (T.canEnter(B, d, pp) && SG.chance(T.pushChance(a, d))) {
+    var ground = T.pushGround(B, d);
+    if (T.canEnter(B, d, pp) && SG.chance(T.pushChance(a, d, B))) {
       d.c = pp[0]; d.r = pp[1];
       if (T.canEnter(B, a, old)) { a.c = old[0]; a.r = old[1]; a.moved = true; }
       msg += ', 한 칸 밀어냈다';
       B.fxForm = { kind: 'push', ok: true };
       T.moraleShift(B, a.side, 1);
+    } else if (ground !== 'open') {
+      // 성안 수비군은 성벽에 기대어 버틴다 (짓누르는 피해도 작다)
+      var hold = T.hit(B, d, Math.round(T.damage(B, a, d, 0.1)));
+      done[d.id] += hold; B.lastHits[0].dmg += hold;
+      msg += ground === 'keep' ? ', 본성을 지키는 부대는 꿈쩍도 하지 않았다' : ', 성벽에 기댄 수비군은 밀리지 않았다';
+      if (hold) msg += ' (-' + SG.fmt(hold) + ')';
+      B.fxForm = { kind: 'push', ok: false, hold: true };
     } else {
       var crush = T.hit(B, d, Math.round(T.damage(B, a, d, 0.4)));
       done[d.id] += crush; B.lastHits[0].dmg += crush;

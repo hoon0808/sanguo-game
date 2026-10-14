@@ -159,7 +159,7 @@ SG.AI.military = async function (fid, domesticOnly) {
       if (ratio > need && score > bestScore) { best = n; bestScore = score; }
     });
     if (best && plan.length) {
-      var foodNeed = Math.ceil(send / 100);
+      var foodNeed = SG.supplyNeed(send, 20);
       if (c.food < foodNeed + 300) continue;
       attacked[best] = true;
       await SG.launchAttack(cid, best, plan);

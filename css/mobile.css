@@ -359,3 +359,10 @@ html.compact .duel-chip { font-size: 13px; padding: 2px 8px; }
 html.compact .duel-pop { font-size: 28px; }
 @media (max-height: 420px) { html.compact .duel-f img { width: 76px; height: 76px; } html.compact .duel-n span { display: none; } }
 html.portrait .duel-f img { width: 120px; height: 120px; }
+/* 보급·매수 (2026-10-14): 세로 화면은 위 막대가 좁아 군량·금을 아래 부대 정보 칸 맨 위에 */
+html.portrait .bt-top .bt-sup { display: none; }
+html.portrait .bt-sup.bt-sup-side { display: flex; margin: 6px 8px 0; font-size: 12px; }
+html.compact .sup-row { grid-template-columns: 1fr; gap: 2px; }
+html.compact .sup-row .note { font-size: 11px; }
+html.compact .sup-days { justify-self: end; font-size: 12px; }
+html.portrait .bt-cmd-h { display: flex; align-items: center; gap: 8px; } html.portrait .bt-cmd-h .bt-sup-side { margin: 0 0 0 auto; }

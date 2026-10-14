@@ -105,6 +105,17 @@ SG.T.create = function (atk, def) {
   dSpots = [[K.c, K.r]].concat(dSpots.filter(function (p) { return !(p[0] === K.c && p[1] === K.r); }));
   field.forEach(function (u, i) { if (u.n > 0 || !u.oid) B.units.push(T.unit(B, u, 'def', dSpots[i][0], dSpots[i][1])); });
   B.wallBonus = 1 + 0.3 * t.wall / SG.CITY_SIZE[SG.CITIES[def.city].size].wallMax;
+  // 보급: 공격군은 챙겨 온 군량·금으로 싸운다 (군량이 떨어지거나 보급대 粮 칸을 빼앗기면 진다). 수비군은 도시 금으로 매수할 수 있다
+  var atot = atk.units.reduce(function (s, u) { return s + u.n; }, 0);
+  // 보급대는 공격군 출발 칸들 사이 (0,6). 성벽·물이면 가까운 다른 칸
+  B.depot = { c: 0, r: 6 };
+  [[0, 6], [0, 4], [1, 6], [1, 4], [0, 8], [0, 2]].some(function (q) {
+    var tt = B.map[T.key(q[0], q[1])];
+    if (tt !== 'wall' && tt !== 'water' && tt !== 'mountain' && !T.at(B, q[0], q[1])) { B.depot = { c: q[0], r: q[1] }; return true; }
+    return false;
+  });
+  B.supply = { food: atk.food != null ? atk.food : SG.supplyNeed(atot, SG.T.DAYS), gold: { atk: atk.gold || 0, def: def.fid ? Math.max(0, t.gold) : 0 } };
+  B.turned = [];
   return B;
 };
 SG.T.unit = function (B, ref, side, c, r) {
@@ -399,6 +410,42 @@ SG.T.strategy = function (B, u, t, kind) {
   return msg;
 };
 
+// ---- 보급·매수
+SG.T.dailyFood = function (B) { return SG.supplyNeed(SG.T.alive(B, 'atk').reduce(function (s, u) { return s + u.n; }, 0), 1); };
+// 매수: 3칸 안의 적 장수를 금으로 꾀어 편을 바꾸게 한다 (군주와 그 가족은 넘어오지 않음)
+SG.T.bribeTargets = function (B, u) {
+  if (!u.oid) return [];
+  return SG.T.alive(B).filter(function (x) { return x.side !== u.side && x.oid && !x.turned && SG.T.dist([u.c, u.r], [x.c, x.r]) <= 3 && SG.T.bribeChance(B, u, x) > 0; });
+};
+SG.T.bribePrice = function (B, t) { return SG.bribePrice(t.oid, t.n); };
+SG.T.bribeChance = function (B, u, t) {
+  var so = SG.S.off[t.oid], tf = so && SG.S.forces[so.f];
+  if (!so || so.s !== 'force' || !tf || tf.lord === t.oid || SG.isKin(t.oid, tf.lord)) return 0;
+  var bf = SG.S.forces[u.side === 'atk' ? B.atk.fid : B.def.fid], lord = SG.O(bf ? bf.lord : u.oid);
+  var p = 0.05 + (80 - so.loy) / 90 + (SG.O(u.oid).cha - 60) / 250 + (lord.cha - 60) / 300 + (t.n < t.max * 0.5 ? 0.1 : 0);
+  return SG.clamp(p, 0, 0.85);
+};
+SG.T.bribe = function (B, u, t) {
+  var sd = u.side, price = SG.T.bribePrice(B, t), p = SG.T.bribeChance(B, u, t), msg;
+  if (!B.supply || B.supply.gold[sd] < price) { u.done = true; return u.name + '은(는) 매수할 금이 모자랐다.'; }
+  var bf = sd === 'atk' ? B.atk.fid : B.def.fid;
+  if (SG.chance(p)) {
+    B.supply.gold[sd] -= price;
+    t.side = sd; t.turned = true; t.done = true; t.conf = 0;
+    B.turned.push({ oid: t.oid, to: sd });
+    msg = u.name + '이(가) 금 ' + SG.fmt(price) + '(으)로 ' + t.name + '을(를) 매수했다! ' + t.name + ' 부대가 ' + (bf ? SG.forceName(bf) : '') + ' 쪽으로 돌아섰다.';
+    SG.T.moraleShift(B, sd, 4);
+  } else {
+    var lost = Math.round(price / 2);
+    B.supply.gold[sd] -= lost;
+    msg = t.name + '이(가) ' + u.name + '의 매수를 뿌리쳤다 (금 ' + SG.fmt(lost) + ' 잃음).';
+  }
+  B.log.push(msg);
+  u.done = true;
+  SG.T.checkEnd(B);
+  return msg;
+};
+
 // ---- 일기토: 붙어 있는 적 장수에게 신청
 SG.T.duelTargets = function (B, u) {
   if (!u.oid) return [];
@@ -451,6 +498,10 @@ SG.T.checkEnd = function (B) {
   else if (!d.length) B.over = 'atk';
   else if (keep && keep.side === 'atk') { B.over = 'atk'; B.log.push(keep.name + '이(가) 본성을 점령했다!'); }
   else if (B.morale.atk <= 5) { B.over = 'def'; B.log.push('공격군의 사기가 무너져 물러났다.'); }
+  else if (B.depot) {
+    var raider = SG.T.at(B, B.depot.c, B.depot.r);
+    if (raider && raider.side === 'def') { B.over = 'def'; B.depotLost = true; B.log.push(raider.name + '이(가) 공격군의 보급대를 빼앗았다! 보급이 끊긴 공격군이 무너졌다.'); }
+  }
   return B.over;
 };
 SG.T.endSide = function (B) {
@@ -460,7 +511,12 @@ SG.T.endSide = function (B) {
   else {
     B.side = 'atk';
     B.day++;
-    if (B.day > SG.T.DAYS) { B.over = 'def'; B.log.push(SG.T.DAYS + '일이 지나 군량이 바닥났다. 공격군이 물러난다.'); }
+    // 하루가 지나면 공격군이 군량을 먹는다
+    if (B.supply) {
+      B.supply.food -= SG.T.dailyFood(B);
+      if (B.supply.food < 0) { B.supply.food = 0; B.over = 'def'; B.supplyOut = true; B.log.push('군량이 떨어졌다! 굶주린 공격군이 물러난다.'); }
+    }
+    if (!B.over && B.day > SG.T.DAYS) { B.over = 'def'; B.log.push(SG.T.DAYS + '일이 지나 공격군이 지쳐 물러난다.'); }
   }
   // 혼란한 부대는 이번 차례에 움직이지 못한다
   B.units.forEach(function (u) { if (u.side === B.side && u.conf > 0) u.done = true; });
@@ -477,6 +533,15 @@ SG.T.result = function (B) {
   var res = { winner: B.over || 'def', log: B.log.slice(-12), captured: [], killed: B.killed.slice(), days: B.day };
   B.captured.forEach(function (cp) { res.captured.push({ oid: cp.oid, by: cp.by }); });
   B.atk.morale = B.morale.atk; B.def.morale = B.morale.def;
+  // 매수되어 편을 바꾼 부대는 그쪽 군대로 옮긴다
+  B.units.forEach(function (u) {
+    if (!u.turned) return;
+    var from = u.side === 'atk' ? B.def.units : B.atk.units, to = u.side === 'atk' ? B.atk.units : B.def.units, i = from.indexOf(u.ref);
+    if (i >= 0) { from.splice(i, 1); to.push(u.ref); }
+  });
+  res.turned = (B.turned || []).slice();
+  if (B.supply) { B.atk.food = Math.max(0, B.supply.food); B.atk.gold = Math.max(0, B.supply.gold.atk); res.defGold = B.supply.gold.def; }
+  res.depotLost = !!B.depotLost; res.supplyOut = !!B.supplyOut;
   // 수비 패배 시 예비 장수들은 도시와 함께 처리된다
   return res;
 };
@@ -493,6 +558,12 @@ SG.T.aiUnit = function (B, u) {
     }).sort(function (a, b) { return b.p - a.p; })[0];
     if (st && st.p >= 0.55) return { type: 'strat', target: st.t, kind: st.kind };
   }
+  // 1-1) 매수 (금이 있고 넘어올 만한 장수가 가까이 있으면)
+  if (B.supply && B.supply.gold[u.side] > 0 && SG.chance(0.5)) {
+    var bb = T.bribeTargets(B, u).map(function (t) { return { t: t, p: T.bribeChance(B, u, t), c: T.bribePrice(B, t) }; })
+      .filter(function (x) { return x.c <= B.supply.gold[u.side] && x.p >= 0.45; }).sort(function (a, b) { return b.p * b.t.n - a.p * a.t.n; })[0];
+    if (bb) return { type: 'bribe', target: bb.t };
+  }
   // 2) 일기토 (무력이 크게 앞설 때)
   var dt = T.duelTargets(B, u).filter(function (t) { return SG.duelWinChance(u.oid, t.oid) > 0.72; })[0];
   if (dt && SG.chance(0.5)) return { type: 'duel', target: dt };
@@ -500,16 +571,24 @@ SG.T.aiUnit = function (B, u) {
   var reach = T.reachable(B, u), bestK = T.key(u.c, u.r), bestScore = -1e9;
   var enemies = T.alive(B).filter(function (x) { return x.side !== u.side; });
   var keepFree = !T.at(B, K.c, K.r) || T.at(B, K.c, K.r) === u;
+  // 보급대: 수비 기병은 지키는 부대가 없으면 노리고, 공격군은 적이 다가오면 지키러 간다
+  var D = B.depot, guarded = D && T.alive(B, 'atk').some(function (a) { return a !== u && T.dist([a.c, a.r], [D.c, D.r]) <= 2; });
+  var raidNear = D && enemies.concat([]).some(function (e) { return e.side === 'def' && T.dist([e.c, e.r], [D.c, D.r]) <= 4; });
   Object.keys(reach).forEach(function (k) {
     var p = k.split(',').map(Number), s = 0;
     var tt = B.map[k];
-    if (u.side === 'atk') {
+    if (u.side === 'atk' && u.id === B.guard) {
+      // 지킴이: 보급대 곁에 붙어 있고, 다가온 적만 친다
+      s -= T.dist(p, [D.c, D.r]) * 60;
+      if (enemies.some(function (e) { return T.dist(p, [e.c, e.r]) <= T.range(u); })) s += 40;
+    } else if (u.side === 'atk') {
       if (tt === 'keep') s += 1000;
       s -= T.dist(p, [K.c, K.r]) * 6;
       var adj = enemies.filter(function (e) { return T.dist(p, [e.c, e.r]) <= T.range(u); });
       if (adj.length) s += 30 + Math.max.apply(null, adj.map(function (e) { return 20 * (1 - e.n / Math.max(1, e.max)) + (u.n > e.n ? 15 : 0) + 18 * (SG.match(u.t, e.t) - 1); }));
       if (u.t === 'arc' && enemies.some(function (e) { return T.dist(p, [e.c, e.r]) === 1; })) s -= 25;
       s += (T.TERRAIN[tt].def - 1) * 20;
+      if (raidNear && T.dist([u.c, u.r], [D.c, D.r]) <= 7) s -= T.dist(p, [D.c, D.r]) * 14;
     } else {
       var dk = T.dist(p, [K.c, K.r]);
       if (tt === 'keep') {
@@ -523,6 +602,11 @@ SG.T.aiUnit = function (B, u) {
       s += (T.TERRAIN[tt].def - 1) * 60;
       var near = enemies.reduce(function (m, e) { return Math.min(m, T.dist(p, [e.c, e.r])); }, 99);
       if (!adj2.length) s -= near * 2;
+      if (D) {
+        var dd = T.dist(p, [D.c, D.r]);
+        if (dd === 0) s += 3000;
+        else if (u.t === 'cav' && !guarded) s += Math.max(0, 10 - dd) * 30;
+      }
     }
     if (s > bestScore) { bestScore = s; bestK = k; }
   });
@@ -537,9 +621,17 @@ SG.T.aiAct = function (B, u) {
     var strongest = T.alive(B, 'def').sort(function (a, b) { return (b.lead + b.n / 300) - (a.lead + a.n / 300); })[0];
     B.keeper = strongest ? strongest.id : null;
   }
+  // 공격군: 수비에 기병이 있으면 한 부대를 보급대 지킴이로 남긴다
+  var gd = B.guard && B.units.filter(function (x) { return x.id === B.guard; })[0];
+  if (u.side === 'atk' && B.depot && (!gd || gd.n <= 0 || gd.side !== 'atk')) {
+    var dl = T.alive(B, 'def'), cavN = dl.filter(function (x) { return x.t === 'cav'; }).reduce(function (s, x) { return s + x.n; }, 0);
+    var foeCav = cavN >= 0.25 * dl.reduce(function (s, x) { return s + x.n; }, 0), mine = T.alive(B, 'atk');
+    B.guard = foeCav && mine.length >= 3 ? mine.slice().sort(function (a, b) { return (a.t === 'cav') - (b.t === 'cav') || a.n - b.n; })[0].id : null;
+  }
   var plan = T.aiUnit(B, u);
   if (!plan) { u.done = true; return events; }
   if (plan.type === 'strat') { events.push({ type: 'strat', u: u, t: plan.target, msg: T.strategy(B, u, plan.target, plan.kind) }); return events; }
+  if (plan.type === 'bribe') { var bt = plan.target; events.push({ type: 'bribe', u: u, t: bt, msg: T.bribe(B, u, bt), ok: bt.turned === true }); return events; }
   if (plan.type === 'duel') {
     var acc = SG.isPlayer(plan.target.side === 'atk' ? B.atk.fid : B.def.fid) ? null : T.duelAccept(B, u, plan.target);
     events.push({ type: 'duel', u: u, t: plan.target, ask: acc === null });

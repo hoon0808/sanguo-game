@@ -58,8 +58,18 @@ SG.makeDefense = function (cid) {
   return { fid: c.owner, city: cid, units: units, train: c.train, morale: c.morale };
 };
 
-// 출진 검사 + 부대 편성. units: [{oid, n}]
-SG.prepareAttack = function (from, to, units) {
+// 군량: 병사 1,000명이 하루에 식량 1을 먹는다 (출진할 때 10일치 이상 챙겨야 함)
+SG.supplyNeed = function (total, days) { return days * Math.max(1, Math.ceil(total / 1000)); };
+SG.MIN_SUPPLY_DAYS = 10;
+// 매수 값: 거느린 병사가 많고 능력이 높을수록 비싸다
+SG.bribePrice = function (oid, n) { var o = SG.O(oid); return Math.round((100 + n / 20 + (o.lead + o.war + o.int) * 1.5) / 10) * 10; };
+// 컴퓨터가 챙기는 보급: 30일치(없으면 있는 만큼), 매수용 금은 도시 금의 30% (최대 1,500)
+SG.defaultSupply = function (from, total) {
+  var c = SG.S.cities[from];
+  return { food: Math.min(c.food, SG.supplyNeed(total, 30)), gold: Math.min(Math.floor(c.gold * 0.3), 1500) };
+};
+// 출진 검사 + 부대 편성. units: [{oid, n}], supply: {food, gold} (없으면 컴퓨터 기본값)
+SG.prepareAttack = function (from, to, units, supply) {
   var c = SG.S.cities[from], t = SG.S.cities[to], fid = c.owner;
   if (SG.ADJ[from].indexOf(to) < 0) return { ok: false, msg: '붙어 있는 도시만 공격할 수 있습니다' };
   if (t.owner === fid) return { ok: false, msg: '우리 도시입니다' };
@@ -79,27 +89,31 @@ SG.prepareAttack = function (from, to, units) {
     var tk = SG.TROOP_KEYS[k];
     if (need[tk] > pool[tk]) return { ok: false, msg: SG.TROOPS[tk].n + '이(가) 부족합니다 (필요 ' + SG.fmt(need[tk]) + ', 있음 ' + SG.fmt(pool[tk]) + ')' };
   }
-  var food = Math.ceil(total / 100);
-  if (c.food < food) return { ok: false, msg: '군량이 부족합니다 (필요 ' + SG.fmt(food) + ')' };
-  return { ok: true, food: food, total: total };
+  supply = supply || SG.defaultSupply(from, total);
+  var food = Math.floor(supply.food || 0), gold = Math.floor(supply.gold || 0), need = SG.supplyNeed(total, SG.MIN_SUPPLY_DAYS);
+  if (food > c.food) return { ok: false, msg: '도시에 식량이 부족합니다 (있음 ' + SG.fmt(c.food) + ')' };
+  if (food < need) return { ok: false, msg: '군량을 적어도 ' + SG.MIN_SUPPLY_DAYS + '일치(식량 ' + SG.fmt(need) + ') 챙겨야 합니다' };
+  if (gold > c.gold) return { ok: false, msg: '도시에 금이 부족합니다 (있음 ' + SG.fmt(c.gold) + ')' };
+  return { ok: true, food: food, gold: gold, total: total };
 };
 
 // 공격 실행 (비동기: 플레이어가 끼면 화면에서 결정)
-SG.launchAttack = async function (from, to, units) {
-  var chk = SG.prepareAttack(from, to, units);
+SG.launchAttack = async function (from, to, units, supply) {
+  var chk = SG.prepareAttack(from, to, units, supply);
   if (!chk.ok) return chk;
   var c = SG.S.cities[from], t = SG.S.cities[to], fid = c.owner, dfid = t.owner;
   units.forEach(function (u) { u.t = u.t || 'inf'; });
   SG.takeTroops(c, SG.unitsMix(units), from);
-  c.food -= chk.food;
+  c.food -= chk.food; c.gold -= chk.gold;
   units.forEach(function (u) { SG.S.off[u.oid].acted = true; u.max = u.n; });
   (c.used = c.used || {}).attack = 1;
-  var atk = { fid: fid, from: from, units: units, train: c.train, morale: c.morale };
+  var atk = { fid: fid, from: from, units: units, train: c.train, morale: c.morale, food: chk.food, gold: chk.gold };
 
   // 빈 도시: 바로 점령
   if (!dfid || (t.soldiers <= 0 && !SG.officersIn(to, dfid).length)) {
     var prev = dfid;
     SG.takeCity(atk, to);
+    t.food += atk.food; t.gold += atk.gold;
     SG.log(fid, SG.forceName(fid) + ' 세력이 ' + SG.cityName(to) + '을(를) 차지했다.', 'war');
     if (prev) await SG.checkForceDead(prev, fid);
     return { ok: true, winner: 'atk', msg: SG.cityName(to) + '을(를) 차지했다.' };
@@ -232,7 +246,10 @@ SG.autoBattle = function (atk, def) {
   var log = [], t = SG.S.cities[def.city], wallMax = SG.CITY_SIZE[SG.CITIES[def.city].size].wallMax;
   var wallBonus = 1 + 0.4 * t.wall / wallMax;
   var am = atk.morale, dm = def.morale;
-  var res = { winner: 'def', log: log, captured: [], killed: [], days: 0 };
+  var res = { winner: 'def', log: log, captured: [], killed: [], days: 0, turned: [] };
+  if (atk.food == null) atk.food = SG.supplyNeed(SG.armyTotal(atk), 30);
+  // 매수: 싸우기 전에 한 번, 넘어올 만한 수비 장수를 금으로 꾄다
+  if (atk.gold > 0) SG.autoBribe(atk, def, res);
 
   // 일기토
   var ta = atk.units.filter(function (u) { return u.oid; }).sort(function (x, y) { return SG.O(y.oid).war - SG.O(x.oid).war; })[0];
@@ -250,6 +267,16 @@ SG.autoBattle = function (atk, def) {
     res.days = day * 3;
     var aT = SG.armyTotal(atk), dT = SG.armyTotal(def);
     if (aT <= 0 || dT <= 0) break;
+    // 사흘치 군량
+    atk.food -= SG.supplyNeed(aT, 3);
+    if (atk.food < 0) { atk.food = 0; res.supplyOut = true; log.push((day * 3) + '일째: 군량이 떨어졌다! 굶주린 공격군이 물러난다.'); break; }
+    // 수비 기병이 보급대를 노린다 (공격군이 많을수록 잘 지킨다)
+    var dCav = SG.mixShare(def.units).cav || 0;
+    if (SG.chance((0.012 + dCav * 0.05) * SG.clamp(dT / Math.max(1, aT), 0.3, 1))) {
+      res.depotLost = true; log.push((day * 3) + '일째: 수비군이 보급대를 습격해 빼앗았다! 보급이 끊긴 공격군이 무너졌다.');
+      atk.units.forEach(function (u) { u.n = Math.floor(u.n * 0.75); });
+      break;
+    }
     // 병종 상성: 상대 병종 구성에 따라 힘이 오르내린다. 성벽이 있으면 공격 기병은 약하고 수비 궁병은 강하다
     var aS = SG.mixShare(atk.units), dS = SG.mixShare(def.units), walled = t.wall > wallMax * 0.15;
     var aP = atk.units.reduce(function (s, u) { return s + (u.n > 0 ? SG.unitPower(u.oid, u.n, atk.train, am, u.t) * SG.matchVs(u.t, dS) * (walled && u.t === 'cav' ? 0.85 : 1) : 0); }, 0) * (SG.aiMul ? SG.aiMul(atk.fid, 'power') : 1);
@@ -266,10 +293,36 @@ SG.autoBattle = function (atk, def) {
   // 전멸 부대 장수 처리
   atk.units.concat(def.units).forEach(function (u) { if (u.oid && u.n <= 0 && !u.out) SG.unitBroken(res, u); });
   var aT2 = SG.armyTotal(atk), dT2 = SG.armyTotal(def);
-  res.winner = (dT2 <= 0 || (dm <= 0 && aT2 > 0)) && aT2 > 0 ? 'atk' : 'def';
+  res.winner = !res.supplyOut && !res.depotLost && (dT2 <= 0 || (dm <= 0 && aT2 > 0)) && aT2 > 0 ? 'atk' : 'def';
   if (res.winner === 'def' && aT2 > 0 && dT2 > 0) log.push('공격군이 성을 함락하지 못하고 물러났다.');
   atk.morale = am; def.morale = dm;
   return res;
+};
+// 자동 전투의 매수: 공격 장수 중 매력이 가장 높은 이가 넘어올 확률이 가장 높은 수비 장수를 꾄다
+SG.autoBribe = function (atk, def, res) {
+  var S = SG.S, bf = S.forces[atk.fid]; if (!bf) return;
+  var who = atk.units.filter(function (u) { return u.oid; }).sort(function (a, b) { return SG.O(b.oid).cha - SG.O(a.oid).cha; })[0];
+  if (!who) return;
+  var cha = SG.O(who.oid).cha, lord = SG.O(bf.lord);
+  var best = null;
+  def.units.forEach(function (u) {
+    if (!u.oid || u.n <= 0) return;
+    var so = S.off[u.oid], tf = S.forces[so.f];
+    if (!tf || tf.lord === u.oid || SG.isKin(u.oid, tf.lord)) return;
+    var price = SG.bribePrice(u.oid, u.n);
+    var p = SG.clamp(0.05 + (80 - so.loy) / 90 + (cha - 60) / 250 + (lord.cha - 60) / 300, 0, 0.85);
+    if (price <= atk.gold && p >= 0.3 && (!best || p * u.n > best.p * best.u.n)) best = { u: u, p: p, price: price };
+  });
+  if (!best) return;
+  if (SG.chance(best.p)) {
+    atk.gold -= best.price;
+    def.units.splice(def.units.indexOf(best.u), 1); atk.units.push(best.u); best.u.max = best.u.n;
+    res.turned.push({ oid: best.u.oid, to: 'atk' });
+    res.log.push(SG.name(who.oid) + '이(가) 금 ' + SG.fmt(best.price) + '(으)로 ' + SG.name(best.u.oid) + '을(를) 매수했다! ' + SG.name(best.u.oid) + ' 부대가 편을 바꾸었다.');
+  } else {
+    var lost = Math.round(best.price / 2); atk.gold -= lost;
+    res.log.push(SG.name(best.u.oid) + '이(가) ' + SG.name(who.oid) + '의 매수를 뿌리쳤다 (금 ' + SG.fmt(lost) + ' 잃음).');
+  }
 };
 SG.spreadDamage = function (units, dmg, total) {
   var lost = 0;
@@ -315,7 +368,23 @@ SG.finishBattle = async function (atk, def, res) {
     if (SG.kill(oid, '전투 중 목숨을 잃었다')) lordsLost.push(f);
   });
 
+  // 매수되어 편을 바꾼 장수는 그 세력에 들어간다
+  (res.turned || []).forEach(function (tv) {
+    var so = SG.S.off[tv.oid], nf = tv.to === 'atk' ? fid : dfid;
+    if (!so || so.s !== 'force' || !nf || so.f === nf) return;
+    SG.join(tv.oid, nf, tv.to === 'atk' ? from : to);
+    SG.log(nf, SG.name(tv.oid) + '이(가) 매수되어 ' + SG.forceName(nf) + ' 세력에 들어왔다.', 'person');
+  });
+  // 수비군이 매수에 쓴 금은 도시 금에서 빠진다
+  if (dfid && res.defGold != null) t.gold = Math.max(0, Math.min(t.gold, Math.round(res.defGold)));
+  // 남은 군량·금: 이기면 차지한 도시로, 지면 집으로, 보급대를 빼앗기면 수비 도시로
+  var sF = Math.max(0, Math.round(atk.food || 0)), sG = Math.max(0, Math.round(atk.gold || 0));
   var defLeft = SG.armyTotal(def);
+  if (res.depotLost) {
+    if (dfid) { t.food += sF; t.gold += sG; }
+    SG.log(fid, SG.forceName(fid) + ' 세력이 보급대를 빼앗겨 ' + [sF ? '식량 ' + SG.fmt(sF) : '', sG ? '금 ' + SG.fmt(sG) : ''].filter(Boolean).join('·') + '을(를) 잃었다.', 'warn');
+    sF = 0; sG = 0;
+  }
   if (res.winner === 'atk') {
     // 수비 장수: 도주 또는 포로
     var flee = SG.ADJ[to].filter(function (n) { return SG.S.cities[n].owner === dfid; });
@@ -329,12 +398,15 @@ SG.finishBattle = async function (atk, def, res) {
       } else captives.push({ oid: oid, by: fid });
     });
     SG.takeCity(atk, to);
+    t.food += sF; t.gold += sG;
     t.loyal = Math.max(0, t.loyal - 10);
     SG.log(fid, SG.forceName(fid) + ' 세력이 ' + SG.cityName(to) + '을(를) 함락했다!', 'war');
   } else {
     SG.setTroopsFromUnits(t, def.units);
     t.morale = SG.clamp(def.morale, 20, 100);
     SG.returnArmy(atk);
+    var home0 = SG.S.cities[atk.from].owner === fid ? atk.from : SG.nearestOwn(fid, atk.from);
+    if (home0) { SG.S.cities[home0].food += sF; SG.S.cities[home0].gold += sG; }
     SG.log(fid, SG.forceName(dfid) + ' 세력이 ' + SG.cityName(to) + '을(를) 지켜냈다.', 'war');
   }
   // 포로 처리

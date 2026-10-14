@@ -1532,3 +1532,28 @@ html.compact .t-diff-h small, html.compact .diff-desc { display: none; }
 @media (max-width: 520px) { .diff-b i { display: none; } }
 .t-diff { max-width: min(460px, calc(100vw - 44px)); }
 .chip.convoy { background: rgba(176, 138, 62, .18); color: #6b5214; border-color: rgba(176, 138, 62, .5); }
+
+/* ---- 보급·매수 */
+.supply { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.sup-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.sup-row .field { margin: 0; }
+.sup-days { font-size: 14px; white-space: nowrap; padding: 2px 8px; border-radius: 10px; }
+.sup-days.good { background: rgba(47, 122, 64, .14); color: #2f7a40; } .sup-days.warn { background: rgba(178, 128, 40, .16); color: #8a5a12; } .sup-days.bad { background: rgba(178, 56, 44, .14); color: #b2382c; }
+.supply .note { margin: 2px 0 0; font-size: 12px; }
+.bt-sup { display: flex; gap: 6px; align-items: center; margin-left: 10px; font-size: 13px; font-weight: 600; }
+.bt-sup > span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 4px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; }
+.bt-sup i { font-style: normal; font-family: var(--f-display); width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #6b5214; color: #fff0c2; font-size: 11px; }
+.bt-sup .sup-food.warn { border-color: #c79032; color: #8a5a12; } .bt-sup .sup-food.bad { border-color: #b2382c; color: #b2382c; background: rgba(178, 56, 44, .1); }
+.depot-hex { fill: rgba(255, 236, 190, .28); stroke-width: 2.5; stroke-dasharray: 6 4; pointer-events: none; }
+.depot-cart { fill: #8a6a3a; stroke: #3d2c16; stroke-width: 1; }
+.depot-wheel { fill: #3d2c16; }
+.depot-sack { fill: #e8d8a8; stroke: #8a7a4a; stroke-width: .8; }
+.depot-tag { stroke: #fff6dc; stroke-width: 1.2; }
+.depot-ch { font-family: var(--f-display); font-size: 11px; fill: #fff; }
+.depot { pointer-events: none; }
+.depot.lost .depot-hex { fill: rgba(178, 56, 44, .35); stroke: #b2382c !important; }
+.bt-res-why { margin: 6px 0; padding: 6px 10px; border-radius: 4px; background: rgba(178, 56, 44, .1); color: #8e2c22; font-weight: 600; }
+html.compact .bt-sup { margin-left: 4px; font-size: 11px; }
+html.compact .bt-sup > span { padding: 2px 6px 2px 3px; }
+
+.bt-sup.bt-sup-side { display: none; }

@@ -471,6 +471,29 @@ SG.UI.cmdAttack = async function (cid) {
   }
   function plan() { return picked.map(function (o) { return { oid: o, n: alloc[o] ? alloc[o].n : 0, t: alloc[o] ? alloc[o].t : 'inf' }; }); }
   picked.push(ready[0]); autoOne(ready[0]);
+  // ---- 군량·군자금: 군량은 하루에 병사 1,000명당 1씩 먹고(10일치 이상), 금은 전투 중 적 장수 매수에 쓴다
+  var sup = { food: null, gold: Math.min(Math.floor(c.gold * 0.3 / 10) * 10, 800), touched: false };
+  var supEl = h('div', { class: 'supply' });
+  function sentNow() { return plan().reduce(function (s, u) { return s + u.n; }, 0); }
+  function renderSupply() {
+    supEl.innerHTML = '';
+    var sent = sentNow(), day = SG.supplyNeed(sent, 1), need = SG.supplyNeed(sent, SG.MIN_SUPPLY_DAYS);
+    if (!sup.touched || sup.food == null) sup.food = Math.min(c.food, SG.supplyNeed(sent, 30));
+    sup.food = Math.min(sup.food, c.food);
+    var days = h('b', { class: 'sup-days' }), gl = h('span', { class: 'note' });
+    function upd() {
+      var d = Math.floor(sup.food / Math.max(1, day));
+      days.textContent = '약 ' + d + '일 버팀';
+      days.className = 'sup-days ' + (sup.food < need ? 'bad' : d < 20 ? 'warn' : 'good');
+      gl.textContent = sup.gold ? '적 장수 매수에 씀 (한 번에 금 400~700쯤)' : '금이 없으면 매수를 못 합니다';
+    }
+    var sF = SG.UI.slider('군량 (식량)', Math.max(0, c.food), sup.food, function (v) { sup.food = v; sup.touched = true; upd(); });
+    var sG = SG.UI.slider('군자금 (금)', Math.max(0, c.gold), sup.gold, function (v) { sup.gold = v; upd(); });
+    supEl.appendChild(h('div', { class: 'sup-row' }, [sF, days]));
+    supEl.appendChild(h('div', { class: 'sup-row' }, [sG, gl]));
+    supEl.appendChild(h('p', { class: 'note', text: '하루에 식량 ' + day + ' · 적어도 ' + SG.MIN_SUPPLY_DAYS + '일치(' + SG.fmt(need) + ') · 군량이 떨어지거나 전장 왼쪽의 보급대(粮)를 빼앗기면 집니다 · 남은 군량·금은 이기면 차지한 도시로, 지면 집으로 돌아옵니다' }));
+    upd();
+  }
 
   // ---- 부대 편성: 장수마다 병종과 병사 수
   function renderForm() {
@@ -509,6 +532,7 @@ SG.UI.cmdAttack = async function (cid) {
 
   function renderInfo() {
     info.innerHTML = '';
+    renderSupply();
     var t = S.cities[target];
     var p = plan();
     var dS = t.owner ? SG.mixShare(SG.makeDefense(target).units) : { inf: 1, cav: 0, arc: 0 };
@@ -523,7 +547,7 @@ SG.UI.cmdAttack = async function (cid) {
     var vcls = !t.owner && t.soldiers <= 0 ? 'good' : ratio > 1.5 ? 'good' : ratio > 1.1 ? 'even' : 'bad';
     function mixLine(m) { return SG.TROOP_KEYS.filter(function (k) { return m[k] > 0; }).map(function (k) { return SG.TROOPS[k].h + ' ' + SG.fmt(m[k]); }).join(' · ') || '없음'; }
     info.appendChild(h('div', { class: 'vs' }, [
-      SG.UI.vsSide(cid, c.owner, '우리 군 · ' + SG.cityName(cid), p.map(function (u) { return u.oid; }), '병사 ' + SG.fmt(sent) + ' (' + mixLine(mm) + ') · 군량 ' + SG.fmt(Math.ceil(sent / 100)) + '/' + SG.fmt(c.food), 'me'),
+      SG.UI.vsSide(cid, c.owner, '우리 군 · ' + SG.cityName(cid), p.map(function (u) { return u.oid; }), '병사 ' + SG.fmt(sent) + ' (' + mixLine(mm) + ')', 'me'),
       h('div', { class: 'mid' }, [h('span', { text: '對' })]),
       SG.UI.vsSide(target, t.owner, SG.cityName(target) + ' · ' + (t.owner ? SG.forceName(t.owner) : '공백지'), defOffs, '병사 ' + SG.fmt(t.soldiers) + ' (' + mixLine(tp) + ') · 성벽 ' + t.wall, 'foe')
     ]));
@@ -552,6 +576,8 @@ SG.UI.cmdAttack = async function (cid) {
     body.appendChild(h('div', { class: 'pick-cards', style: { maxHeight: '180px' } }, [tbl]));
     body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
     body.appendChild(formEl);
+    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '四' }), '군량·군자금', h('small', { text: '챙겨 갈 식량과 금' })]));
+    body.appendChild(supEl);
     body.appendChild(info);
     renderForm(); renderInfo();
   }
@@ -559,13 +585,13 @@ SG.UI.cmdAttack = async function (cid) {
   var ok = await SG.UI.modal({ title: '출진 — ' + SG.cityName(cid), body: body, size: 'wide', cancel: false, buttons: [
     { label: '취소', value: false },
     { label: '출진!', value: true, cls: 'primary', check: function () {
-      var r = SG.prepareAttack(cid, target, plan());
+      var r = SG.prepareAttack(cid, target, plan(), { food: sup.food, gold: sup.gold });
       if (!r.ok) { SG.UI.toast(r.msg, true); return false; } return true;
     } }] });
   if (!ok) return;
   // 출진 전후를 비교해 도시 장부·가운데 결과 카드·지도에 보인다
   var oc = { kind: 'attack', cid: cid, cities: [cid, target] }, before = SG.UI.snapshot(oc);
-  var res = await SG.launchAttack(cid, target, plan());
+  var res = await SG.launchAttack(cid, target, plan(), { food: sup.food, gold: sup.gold });
   if (!res.ok) SG.UI.toast(res.msg, true);
   else SG.UI.showMilitary(oc, before, { success: res.winner === 'atk', msg: res.msg,
     title: res.winner === 'atk' ? SG.cityName(target) + ' 점령!' : SG.cityName(target) + ' 공략 실패' }, target);

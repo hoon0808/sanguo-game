@@ -76,7 +76,25 @@ SG.UI.tactical = function (atk, def) {
     var gMap = S2('g', { class: 'bt-terrain' }, svgEl);
     var gDeco = S2('g', { class: 'bt-deco' }, svgEl);
     S2('rect', { x: 0, y: 0, width: W, height: H, filter: 'url(#bt-tex)', class: 'bt-grain' }, svgEl);
-    var gHi = S2('g', {}, svgEl), gUnits = S2('g', {}, svgEl), gFx = S2('g', {}, svgEl);
+    var gDepot = S2('g', { class: 'bt-depot' }, svgEl), gHi = S2('g', {}, svgEl), gUnits = S2('g', {}, svgEl), gFx = S2('g', {}, svgEl);
+    // 공격군 보급대 (粮): 수비군이 이 칸에 들어오면 공격군이 진다
+    function drawDepot() {
+      gDepot.innerHTML = '';
+      if (!B.depot) return;
+      var p = SG.UI.hexXY(B.depot.c, B.depot.r);
+      var g = S2('g', { transform: 'translate(' + p.x + ',' + p.y + ')', class: 'depot' + (B.depotLost ? ' lost' : '') }, gDepot);
+      S2('polygon', { points: SG.UI.hexPoints(0, 0, R - 3), class: 'depot-hex', style: 'stroke:' + fcol.atk }, g);
+      // 수레 두 대 + 쌀가마
+      [-9, 7].forEach(function (dx, i) {
+        S2('rect', { x: dx - 8, y: -4 - i * 3, width: 16, height: 9, rx: 2, class: 'depot-cart' }, g);
+        S2('circle', { cx: dx - 4, cy: 6 - i * 3, r: 3, class: 'depot-wheel' }, g);
+        S2('circle', { cx: dx + 4, cy: 6 - i * 3, r: 3, class: 'depot-wheel' }, g);
+        S2('ellipse', { cx: dx, cy: -7 - i * 3, rx: 7, ry: 4, class: 'depot-sack' }, g);
+      });
+      var tg = S2('g', { transform: 'translate(0,' + (R * 0.42) + ')' }, g);
+      S2('rect', { x: -22, y: -9, width: 44, height: 17, rx: 4, class: 'depot-tag', style: 'fill:' + fcol.atk }, tg);
+      var tx = S2('text', { y: 4, 'text-anchor': 'middle', class: 'depot-ch' }, tg); tx.textContent = '粮 보급대';
+    }
 
     // ---- 지형 그리기 (한 번만)
     function drawTerrain() {
@@ -302,6 +320,7 @@ SG.UI.tactical = function (atk, def) {
       if (st.mode === 'attack') SG.T.formTargets(B, u, st.form).forEach(function (t) { mark(t.c, t.r, 'hl-atk'); });
       if (st.mode === 'fire' || st.mode === 'confuse') SG.T.stratTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-strat'); });
       if (st.mode === 'duel') SG.T.duelTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-atk'); });
+      if (st.mode === 'bribe') SG.T.bribeTargets(B, u).forEach(function (t) { mark(t.c, t.r, 'hl-strat'); });
     }
     function sum(side) { return SG.T.alive(B, side).reduce(function (s, u) { return s + u.n; }, 0); }
     function drawTop() {
@@ -319,6 +338,7 @@ SG.UI.tactical = function (atk, def) {
       for (var i = 1; i <= SG.T.DAYS; i++) dbar.appendChild(h('i', { class: i < B.day ? 'past' : i === B.day ? 'now' : '' }));
       days.appendChild(dbar);
       top.appendChild(days);
+      if (B.supply) top.appendChild(supChips(''));
       top.appendChild(h('div', { class: 'sp' }));
       top.appendChild(h('div', { class: 'acts' }, [
         h('button', { class: 'btn small bt-auto', title: '남은 전투를 컴퓨터에게 맡깁니다', text: st.auto ? '자동 진행 중…' : '남은 전투 맡기기', disabled: st.auto || B.over ? true : null, onclick: function () {
@@ -330,9 +350,19 @@ SG.UI.tactical = function (atk, def) {
         h('button', { class: 'btn primary end-turn', id: 'b-end', disabled: !myTurn() ? true : null, onclick: function () { endMyTurn(); } }, [h('span', { class: 'lbl-long', text: '차례 끝내기' }), h('span', { class: 'lbl-short', text: '끝' }), SG.UI.icon('next', 18)])
       ]));
     }
-    var CMD_ICON = { move: 'move', attack: 'attack', fire: 'flag', confuse: 'rumor', duel: 'officer' };
+    // 군량(공격군이 버틸 날)·우리 금
+    function supChips(cls) {
+      var dl = Math.floor(B.supply.food / Math.max(1, SG.T.dailyFood(B))), myGold = B.supply.gold[me];
+      return h('div', { class: 'bt-sup ' + cls, title: '공격군 군량: 하루에 ' + SG.T.dailyFood(B) + '씩 먹습니다. 떨어지거나 보급대(粮)를 빼앗기면 공격군이 집니다' }, [
+        h('span', { class: 'sup-food ' + (dl <= 3 ? 'bad' : dl <= 7 ? 'warn' : '') }, [h('i', { text: '粮' }), (me === 'atk' ? '군량 ' : '적 군량 ') + dl + '일']),
+        h('span', { class: 'sup-gold', title: me === 'atk' ? '챙겨 온 군자금 (매수에 씀)' : '도시 금 (매수에 씀)' }, [h('i', { text: '金' }), SG.fmt(myGold)])
+      ]);
+    }
+    var CMD_ICON = { move: 'move', attack: 'attack', fire: 'flag', confuse: 'rumor', duel: 'officer', bribe: 'reward' };
     function drawSide() {
       side.innerHTML = '';
+      var supTop = B.supply ? supChips('bt-sup-side') : null;
+      if (supTop) side.appendChild(supTop);
       var u = st.sel;
       if (u) {
         var tt = B.map[SG.T.key(u.c, u.r)];
@@ -365,6 +395,7 @@ SG.UI.tactical = function (atk, def) {
           add('화계', 'fire', SG.T.stratTargets(B, u).length > 0);
           add('혼란', 'confuse', SG.T.stratTargets(B, u).length > 0);
           add('일기토', 'duel', SG.T.duelTargets(B, u).length > 0, 'war');
+          add('매수', 'bribe', B.supply && B.supply.gold[me] > 0 && SG.T.bribeTargets(B, u).length > 0);
           acts.appendChild(h('button', { class: 'cmd', type: 'button', onclick: function () { SG.T.wait(B, u); st.sel = null; st.mode = 'idle'; redraw(); autoEndCheck(); } }, [SG.UI.icon('check', 20), h('span', { class: 'cmd-l', text: '대기' })]));
           if (u.moved && st.prev) acts.appendChild(h('button', { class: 'cmd', type: 'button', onclick: function () { u.c = st.prev[0]; u.r = st.prev[1]; u.moved = false; st.prev = null; st.mode = 'move'; redraw(); } }, [SG.UI.icon('next', 20, 'flip'), h('span', { class: 'cmd-l', text: '이동 취소' })]));
           // 공격 형태 고르기 (공격 단추를 누르면 펼쳐짐)
@@ -377,10 +408,11 @@ SG.UI.tactical = function (atk, def) {
                 [h('i', { text: F.h }), h('span', { text: F.n })]);
             })), h('p', { class: 'bf-desc', text: SG.T.FORMS[st.form].desc })]);
           }
-          side.appendChild(h('div', { class: 'sec' }, [h('h4', { text: '명령' }), acts, formsEl,
+          side.appendChild(h('div', { class: 'sec' }, [h('h4', { class: 'bt-cmd-h' }, ['명령', supTop]), acts, formsEl,
             h('p', { class: 'note', style: { marginTop: '8px' }, text: st.mode === 'move' ? '밝은 칸을 눌러 이동하세요. 제자리면 자기 칸을 누르세요.' :
               st.mode === 'attack' ? '공격 형태를 고르고 붉은 칸의 적을 누르세요.' : st.mode === 'duel' ? '붉은 칸의 적 장수에게 일기토를 신청합니다.' :
-              (st.mode === 'fire' || st.mode === 'confuse') ? '금빛 칸의 적을 누르세요. 지력이 높을수록 성공합니다.' : '' })]));
+              (st.mode === 'fire' || st.mode === 'confuse') ? '금빛 칸의 적을 누르세요. 지력이 높을수록 성공합니다.' :
+              st.mode === 'bribe' ? '금빛 칸(3칸 안)의 적 장수를 누르면 값과 성공률을 보여 줍니다. 충성이 낮을수록, 매력이 높을수록 잘 넘어옵니다. 실패하면 금 절반을 잃습니다.' : '' })]));
         }
       } else {
         side.appendChild(h('div', { class: 'panel-empty', html: myTurn() ? '<b>우리 부대를 누르세요.</b><br><br>· 이동 → 공격·계략·일기토 순서로 명령합니다.<br>· 공격군은 <b>本</b>(본성) 칸을 차지하면 이깁니다.<br>· 수비군은 30일을 버티거나 적을 물리치면 이깁니다.<br>· 성벽은 지나갈 수 없고 성문으로만 들어갈 수 있습니다.<br>· 적과 붙은 칸에 들어가면 멈춥니다.' : '적이 움직이는 중…' }));
@@ -449,7 +481,7 @@ SG.UI.tactical = function (atk, def) {
       if (added) { var line = B.log[B.log.length - 1].trim(); say(speakerOf(line), line); }
       else if (!lastSay) say(null, (me === 'atk' ? '공격' : '수비') + ' 쪽입니다. 우리 부대를 눌러 명령을 내리십시오. ' + (me === 'atk' ? '성 가운데 「本」 칸을 차지하면 이깁니다.' : SG.T.DAYS + '일을 버티면 이깁니다.'));
     }
-    function redraw() { drawHi(); drawUnits(); drawTop(); drawSide(); drawLog(); turnBanner(); }
+    function redraw() { drawDepot(); drawHi(); drawUnits(); drawTop(); drawSide(); drawLog(); turnBanner(); }
 
     // 세로 화면에서는 전장이 옆으로 길어 넘치므로, 고른 부대가 보이게 옆으로 밀어 준다
     function reveal(u) {
@@ -489,6 +521,17 @@ SG.UI.tactical = function (atk, def) {
           SG.UI.sfx(okFire ? 'fire' : okConf ? 'confuse' : 'fail');
           if (okFire) { flames(x); if (x.n <= 0) broken(x); } else if (okConf) confuse(x);
           flash(x, okConf ? '혼란' : (okFire ? '-' + SG.fmt(b2 - x.n) : '실패'));
+          return afterAct();
+        }
+        if (st.mode === 'bribe' && x && SG.T.bribeTargets(B, u).indexOf(x) >= 0) {
+          var price = SG.T.bribePrice(B, x), pc = Math.round(SG.T.bribeChance(B, u, x) * 100), have = B.supply.gold[me];
+          if (have < price) { SG.UI.toast('금이 모자랍니다 (필요 ' + SG.fmt(price) + ', 있음 ' + SG.fmt(have) + ')', true); return; }
+          var go = await SG.UI.confirm('매수', SG.josa(x.name + '(충성 ' + SG.S.off[x.oid].loy + ')에게 금 ' + SG.fmt(price) + '을(를) 건넬까요?\n성공률 ' + pc + '% · 넘어오면 그 부대가 우리 편이 되고, 싸움이 끝나면 우리 세력에 들어옵니다.\n실패하면 금 ' + SG.fmt(Math.round(price / 2)) + '을(를) 잃습니다.'), '매수한다', '그만둔다');
+          if (!go) return;
+          SG.T.bribe(B, u, x);
+          SG.UI.sfx(x.turned ? 'coin' : 'fail');
+          flash(x, x.turned ? '매수!' : '거절');
+          if (x.turned) confuse(x);
           return afterAct();
         }
         if (st.mode === 'duel' && x && SG.T.duelTargets(B, u).indexOf(x) >= 0) {
@@ -696,6 +739,7 @@ SG.UI.tactical = function (atk, def) {
               SG.UI.sfx(fireOk ? 'fire' : confOk ? 'confuse' : 'fail');
               if (fireOk) { flames(e.t); if (e.t.n <= 0) broken(e.t); } else if (confOk) confuse(e.t);
             }
+            if (e.type === 'bribe') { SG.UI.sfx(e.ok ? 'coin' : 'fail'); flash(e.t, e.ok ? '매수!' : '거절'); if (e.ok) confuse(e.t); }
             if (e.type === 'duel') {
               var acc = true;
               if (e.ask && !st.auto) {
@@ -774,7 +818,11 @@ SG.UI.tactical = function (atk, def) {
           return h('div', { class: 'bt-res-row' }, [h('i', { class: 'side-dot', style: { background: fcol[sd] } }), h('span', { class: 'bt-res-n', text: fname[sd] }),
             SG.UI.bar(left, Math.max(1, start), sd === me ? 'g' : 'r'), h('span', { class: 'note', text: SG.fmt(left) + ' / ' + SG.fmt(start) })]);
         })).concat([
-        h('p', { class: 'note', text: B.day + '일 동안 싸움' + (B.captured.length ? ' · 사로잡힌 장수: ' + B.captured.map(function (c) { return SG.name(c.oid); }).join(', ') : '') })
+        B.depotLost ? h('p', { class: 'bt-res-why', text: '보급대(粮)를 빼앗겨 공격군이 무너졌습니다. 챙겨 간 군량·금은 수비군 손에 들어갑니다.' }) : null,
+        B.supplyOut ? h('p', { class: 'bt-res-why', text: '군량이 떨어져 공격군이 물러났습니다.' }) : null,
+        B.turned && B.turned.length ? h('p', { class: 'note', text: '매수로 편을 바꾼 장수: ' + B.turned.map(function (t) { return SG.name(t.oid) + '(→' + fname[t.to] + ')'; }).join(', ') }) : null,
+        h('p', { class: 'note', text: B.day + '일 동안 싸움' + (B.captured.length ? ' · 사로잡힌 장수: ' + B.captured.map(function (c) { return SG.name(c.oid); }).join(', ') : '') +
+          (B.supply && !B.depotLost ? ' · 남은 군량 ' + SG.fmt(B.supply.food) + '·금 ' + SG.fmt(B.supply.gold.atk) + (B.over === 'atk' ? ' (차지한 도시로)' : ' (집으로)') : '') })
       ]));
       await SG.UI.modal({ title: won ? '승리' : '패배', size: 'narrow', cancel: true, body: body });
       root.parentNode.removeChild(root);

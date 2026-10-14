@@ -41,6 +41,19 @@ SG.AI.city = function (cid) {
   kinds.sort(function (a, b) { return c[a] / z[a + 'Max'] - c[b] / z[b + 'Max']; });
   var budget = c.gold - 100;
   kinds.forEach(function (k2) { if (budget >= SG.COST.develop) { budget -= SG.COST.develop * 2; add(k2, k2 === 'wall' ? 'lead' : 'pol', function (o) { return SG.cmd.develop(cid, o, k2); }, 1); } });
+  // 계략: 위협받는 전방 도시는 매복, 여유가 있으면 사이 나쁜 이웃 적 도시에 선동·방화 (내응은 플레이어만 — 시험해 보니 컴퓨터가 쓰면 괜히 적만 늘었다)
+  // 난이도: 쉬움이면 컴퓨터는 이 계략들을 쓰지 않는다 (예전 그대로), 보통은 절반쯤
+  var sm = SG.aiMul ? SG.aiMul(fid, 'scheme') : 1;
+  if (SG.cmd.ambush && th.front && sm > 0) {
+    // 선동·방화는 우호도를 깎으므로 이미 사이가 나쁜(우호도 30 미만) 이웃에게만
+    var foes = SG.ADJ[cid].filter(function (x) { var w = SG.S.cities[x].owner; return w && w !== fid && !SG.isAlly(fid, w) && SG.rel(fid, w).fr < 30; });
+    if (th.max > c.soldiers * 0.6 && !SG.ambushOf(cid) && c.gold > 300 && c.soldiers >= 500 && SG.chance(Math.min(1, 0.6 * sm))) add('ambush', 'int', function (o) { return SG.cmd.ambush(cid, o); }, 1.1);
+    if (foes.length && c.gold > 1000 && SG.chance(0.25 * sm)) {
+      var tg = foes.slice().sort(function (a, b) { return SG.S.cities[a].loyal - SG.S.cities[b].loyal; })[0], T = SG.S.cities[tg];
+      if (T.loyal < 50) add('incite', 'int', function (o) { return SG.cmd.incite(cid, o, tg); }, 0.6);
+      else if (T.food > 3000) add('arson', 'int', function (o) { return SG.cmd.arson(cid, o, tg); }, 0.6);
+    }
+  }
   // 남는 장수가 있는데 할 일이 없으면 훈련
   if (!tasks.some(function (t) { return t.key === 'train'; }) && c.soldiers > 0 && c.train < 100) add('train', 'lead', function (o) { return SG.cmd.train(cid, o); }, 0.8);
 

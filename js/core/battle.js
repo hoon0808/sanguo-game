@@ -121,6 +121,9 @@ SG.launchAttack = async function (from, to, units, supply) {
 
   if (dfid) { var r = SG.rel(fid, dfid); r.fr = Math.max(0, r.fr - 25); }
   var def = SG.makeDefense(to);
+  // 내응·매복 (계략으로 미리 꾸며 둔 일)
+  var pre = SG.preBattle ? SG.preBattle(atk, def) : { log: [], turned: [] };
+  atk.pre = pre;
   SG.log(fid, SG.forceName(fid) + ' 세력이 ' + SG.cityName(from) + '에서 ' + SG.forceName(dfid) + ' 세력의 ' +
     SG.cityName(to) + '을(를) 공격했다! (병사 ' + SG.fmt(chk.total) + ' 대 ' + SG.fmt(t.soldiers) + ')', 'war');
 
@@ -129,8 +132,10 @@ SG.launchAttack = async function (from, to, units, supply) {
   var mode = 'auto';
   if (involved && SG.ui && SG.ui.battleMode) mode = await SG.ui.battleMode(atk, def);
   var res;
+  if (pre.log.length && involved && SG.ui && SG.ui.preBattle) await SG.ui.preBattle(atk, def, pre);
   if (mode === 'tactical' && SG.ui && SG.ui.tactical) res = await SG.ui.tactical(atk, def);
-  else res = SG.autoBattle(atk, def);
+  else { res = SG.autoBattle(atk, def); res.log = pre.log.concat(res.log); }
+  res.turned = pre.turned.concat(res.turned || []);
   if (involved && SG.ui && SG.ui.battleReport && mode !== 'tactical') await SG.ui.battleReport(atk, def, res);
   await SG.finishBattle(atk, def, res);
   return { ok: true, winner: res.winner, msg: res.winner === 'atk' ? SG.cityName(to) + ' 점령 성공!' : SG.cityName(to) + ' 공략 실패.' };

@@ -74,7 +74,8 @@ SG.UI.itemList = function () {
 
 // ---- 협력 장수 고르기 (명령 창 위에 붙는 줄). 고른 장수는 SG.UI.pendingHelpers 에 담기고 doCmd 가 명령에 붙인다
 SG.UI.CMD_KEY_OF = { '농업 개발': 'agri', '상업 개발': 'comm', '성벽 보수': 'wall', '민심 안정': 'relief', '징병': 'conscript', '훈련': 'train', '수송': 'transport', '출진': 'attack',
-  '인재 탐색': 'search', '등용': 'recruit', '유언비어': 'rumor', '이간': 'sow', '친선': 'gift', '동맹': 'ally', '항복 권고': 'demand', '교역': 'trade' };
+  '인재 탐색': 'search', '등용': 'recruit', '유언비어': 'rumor', '이간': 'sow', '친선': 'gift', '동맹': 'ally', '항복 권고': 'demand', '교역': 'trade',
+  '선동': 'incite', '방화': 'arson', '내응': 'plot', '매복': 'ambush' };
 SG.UI.pendingHelpers = null;
 SG.UI.coopRow = function (cid, stat, getMain, onChange, costNote) {
   var sel = SG.UI.pendingHelpers = [];

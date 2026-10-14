@@ -7,11 +7,13 @@ SG.COOP_MAX = 3;
 // 명령 → 한 달 한 번을 세는 이름
 SG.CMD_KEY = {
   develop: function (a) { return a[2]; }, relief: 'relief', conscript: 'conscript', train: 'train', search: 'search', recruit: 'recruit',
-  transport: 'transport', trade: 'trade', rumor: 'rumor', sow: 'sow', gift: 'gift', ally: 'ally', demand: 'demand'
+  transport: 'transport', trade: 'trade', rumor: 'rumor', sow: 'sow', gift: 'gift', ally: 'ally', demand: 'demand',
+  incite: 'incite', arson: 'arson', plot: 'plot', ambush: 'ambush'
 };
 SG.CMD_LABEL = {
   agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수', relief: '민심 안정', conscript: '징병', train: '훈련', search: '인재 탐색', recruit: '등용',
-  transport: '수송', trade: '교역', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고', attack: '출진'
+  transport: '수송', trade: '교역', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고', attack: '출진',
+  incite: '선동', arson: '방화', plot: '내응', ambush: '매복'
 };
 // 협력할 수 없는 명령 (한 사람이 하는 일)
 SG.NO_COOP = { transport: 1, attack: 1 };

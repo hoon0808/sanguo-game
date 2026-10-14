@@ -83,6 +83,18 @@ SG.mixOf = function (cid, n) {
   if (inf > p.inf) { var over = inf - p.inf; inf = p.inf; if (p.cav - cav >= over) cav += over; else arc += over; }
   return { inf: inf, cav: cav, arc: arc };
 };
+// 병종별로 고른 수를 도시에 있는 만큼으로 줄인다 (mix 가 숫자면 비율대로)
+SG.pickMix = function (cid, mix) {
+  if (typeof mix !== 'object' || !mix) return SG.mixOf(cid, Math.floor(mix || 0));
+  var p = SG.cityTroops(cid), out = {};
+  SG.TROOP_KEYS.forEach(function (t) { out[t] = SG.clamp(Math.floor(mix[t] || 0), 0, p[t]); });
+  return out;
+};
+SG.mixTotal = function (m) { return m ? (m.inf || 0) + (m.cav || 0) + (m.arc || 0) : 0; };
+// 「步 5,850·騎 1,950·弓 1,950」
+SG.mixText = function (m) {
+  return SG.TROOP_KEYS.filter(function (t) { return m && m[t] > 0; }).map(function (t) { return SG.TROOPS[t].h + ' ' + SG.fmt(m[t]); }).join('·');
+};
 // 부대 목록의 병종별 합
 SG.unitsMix = function (units) {
   var m = { inf: 0, cav: 0, arc: 0 };

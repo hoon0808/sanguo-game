@@ -89,7 +89,7 @@ SG.T.makeMap = function (cid) {
 // ---- 전투 만들기
 SG.T.create = function (atk, def) {
   var T = SG.T, t = SG.S.cities[def.city];
-  var B = { atk: atk, def: def, city: def.city, map: T.makeMap(def.city), units: [], day: 1, side: 'atk', log: [], over: null,
+  var B = { atk: atk, def: def, city: def.city, map: T.makeMap(def.city), units: [], day: 1, side: 'atk', log: (atk.pre && atk.pre.log || []).slice(), over: null,
     morale: { atk: atk.morale, def: def.morale }, train: { atk: atk.train, def: def.train }, captured: [], killed: [], seq: 0 };
   // 수비 장수가 많으면 8명만 성에 나가고 나머지 병사는 나눠 맡는다
   var dUnits = def.units.slice().sort(function (a, b) { return (b.oid ? SG.O(b.oid).lead : 0) - (a.oid ? SG.O(a.oid).lead : 0); });
@@ -97,7 +97,8 @@ SG.T.create = function (atk, def) {
   var extra = reserve.reduce(function (s, u) { return s + u.n; }, 0);
   reserve.forEach(function (u) { u.n = 0; u.reserve = true; });
   field.forEach(function (u, i) { u.n += Math.floor(extra / field.length) + (i === 0 ? extra % field.length : 0); u.max = u.n; });
-  var aSpots = [5, 3, 7, 1, 9].map(function (r) { return [r % 2 === 0 ? 1 : 0, r]; });
+  // 내응으로 넘어온 부대가 있으면 5부대보다 많을 수 있다
+  var aSpots = [5, 3, 7, 1, 9].map(function (r) { return [r % 2 === 0 ? 1 : 0, r]; }).concat([[1, 4], [1, 6], [1, 2], [1, 8], [1, 0], [1, 10]]);
   atk.units.forEach(function (u, i) { B.units.push(T.unit(B, u, 'atk', aSpots[i][0], aSpots[i][1])); });
   var K = T.CASTLE;
   var dSpots = [[K.c, K.r]].concat(T.neighbors(K.c, K.r)).concat([[K.c - 2, K.r], [K.c - 1, K.r - 2], [K.c - 1, K.r + 2]]);

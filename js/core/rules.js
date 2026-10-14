@@ -212,11 +212,12 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   oids = oids || [];
   if (!oids.length) return fail('이동할 장수를 한 명 이상 고르세요');
   for (var i = 0; i < oids.length; i++) if (!SG.ready(cid, oids[i])) return fail('명령할 수 없는 장수가 있습니다');
-  soldiers = SG.clamp(Math.floor(soldiers || 0), 0, c.soldiers);
+  // soldiers: 숫자면 도시 구성 비율대로, {inf, cav, arc} 면 병종별로 고른 만큼
+  var mix = SG.pickMix(cid, soldiers);
+  soldiers = SG.mixTotal(mix);
   gold = SG.clamp(Math.floor(gold || 0), 0, c.gold);
   food = SG.clamp(Math.floor(food || 0), 0, c.food);
-  // 장수·병사·금·식량은 길을 가는 동안 어느 도시에도 없다가 다음 달에 도착한다 (SG.deliverMarches)
-  var mix = SG.mixOf(cid, soldiers);
+  // 장수·병사·금·식량은 길을 가는 동안 어느 도시에도 없다가 다음 달에 도착한다 (SG.deliverMarches). 병종 구성도 그대로 간다
   SG.takeTroops(c, mix, cid);
   c.gold -= gold; c.food -= food;
   oids.forEach(function (o) { SG.S.off[o].march = dest; SG.S.off[o].acted = true; });
@@ -225,7 +226,7 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   if (soldiers) extra.push('병사 ' + SG.fmt(soldiers));
   if (gold) extra.push('금 ' + SG.fmt(gold));
   if (food) extra.push('식량 ' + SG.fmt(food));
-  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 떠났다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '. 다음 달에 도착한다.';
+  var msg = oids.map(SG.name).join(', ') + '이(가) ' + (soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 ' : '') + SG.cityName(dest) + '(으)로 떠났다' + (extra.length > (soldiers ? 1 : 0) ? ' (' + extra.slice(soldiers ? 1 : 0).join(', ') + ' 함께)' : '') + '. 다음 달에 도착한다.';
   if (SG.cmdLog) SG.cmdLog.push({ oid: oids[0], msg: SG.josa(msg), ok: true });
   return { ok: true, msg: msg };
 };
@@ -251,10 +252,10 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   a.food -= food; a.gold -= gold;
   if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food);
   var goods = [gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
-  var what = [soldiers ? '병사 ' + SG.fmt(soldiers) : '', goods].filter(Boolean).join('·');
+  var what = [soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')' : '', goods].filter(Boolean).join('·');
   // 병사는 장수가 이끈다: 데려올 때는 장수가 그 도시에 가서 병사를 이끌고 돌아온다
   var msg = src === cid ? SG.name(oid) + '이(가) ' + what + '을(를) ' + SG.cityName(dest) + '(으)로 실어 보냈다. 다음 달에 도착한다.'
-    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) 다음 달에 도착한다.' : '')
+    : soldiers ? SG.name(oid) + '이(가) ' + SG.cityName(src) + '에 가서 병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')을(를) 이끌고 돌아왔다.' + (goods ? ' ' + goods + '은(는) 다음 달에 도착한다.' : '')
     : SG.name(oid) + '이(가) ' + SG.cityName(src) + '에서 ' + goods + '을(를) 실어 오게 했다. 다음 달에 도착한다.';
   return done(oid, msg, { moved: soldiers, src: src, dest: dest, convoy: (food || gold) ? { gold: gold, food: food } : null });
 };
@@ -283,12 +284,13 @@ SG.deliverMarches = function () {
     d.gold += v.gold; d.food += v.food;
     who.forEach(function (o) { S.off[o].c = dest; });
     if (SG.isPlayer && SG.isPlayer(v.fid)) {
-      var what = [v.n ? '병사 ' + SG.fmt(v.n) : '', v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join('·');
+      var what = [v.n ? '병사 ' + SG.fmt(v.n) + (v.mix ? '(' + SG.mixText(v.mix) + ')' : '') : '', v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join('·');
       SG.log(v.fid, dest === v.to ? (who.map(SG.name).join(', ') || '부대') + '이(가) ' + SG.cityName(dest) + '에 도착했다' + (what ? ' (' + what + ')' : '') + '.'
         : SG.cityName(v.to) + '을(를) 잃어 ' + (who.map(SG.name).join(', ') || '부대') + '이(가) ' + SG.cityName(dest) + '(으)로 갔다.', dest === v.to ? 'sys' : 'warn');
       var a = (S.arrived = S.arrived || {})[dest] = S.arrived[dest] || {};
       a.gold = (a.gold || 0) + v.gold; a.food = (a.food || 0) + v.food; a.soldiers = (a.soldiers || 0) + v.n;
       a.offs = (a.offs || []).concat(who);
+      if (v.n > 0) { a.mix = a.mix || { inf: 0, cav: 0, arc: 0 }; SG.TROOP_KEYS.forEach(function (t) { a.mix[t] += (v.mix && v.mix[t]) || 0; }); }
     }
   });
 };

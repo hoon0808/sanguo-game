@@ -24,6 +24,10 @@ SG.UI.CMD_SCENES = {
   transport: { bg: 'road', lines: ['수레를 몰아 실어다 주고 곧 돌아오겠습니다.', '짐을 단단히 묶어라! 한 톨도 흘리지 말고 전하고 오자.'], sfx: 'march' },
   rumor: { bg: 'night', lines: ['밤을 틈타 저잣거리에 헛소문을 퍼뜨리고 오겠습니다.', '말 한마디가 칼보다 무섭지요. 흐흐.'], sfx: 'confuse' },
   sow: { bg: 'night', lines: ['적의 마음에 의심의 씨앗을 심어 두지요.', '그자의 주군이 그를 의심하게 만들겠습니다.'], sfx: 'confuse' },
+  incite: { bg: 'incite', lines: ['굶주린 백성의 마음에 불씨 하나만 던져 주면 됩니다.', '관리들의 횡포를 떠벌리면 백성들이 들고일어날 것입니다.'], sfx: 'confuse' },
+  arson: { bg: 'arson', lines: ['바람이 부는 밤을 골라 창고에 불을 놓고 오겠습니다.', '곡식이 없으면 적은 싸울 수 없지요.'], sfx: 'fire' },
+  plot: { bg: 'plot', lines: ['밀서를 품고 은밀히 다녀오겠습니다. 그자는 이미 주군에게 불만이 많다 들었습니다.', '때가 오면 성문 안에서 호응하게 하겠습니다.'], sfx: 'confuse' },
+  ambush: { bg: 'ambush', lines: ['길목마다 군사를 숨겨 두겠습니다. 적이 오면 한 놈도 무사하지 못할 것입니다.', '깃발을 눕히고 숨을 죽여라. 신호가 오면 일제히 들이친다!'], sfx: 'drum' },
   gift: { bg: 'hall', lines: ['예물을 갖추어 사신으로 다녀오겠습니다.', '좋은 이웃이 되자고 잘 전하겠습니다.'], sfx: 'coin' },
   ally: { bg: 'hall', lines: ['동맹을 맺고 돌아오겠습니다.', '공동의 적 앞에서 손을 잡자고 설득하겠습니다.'], sfx: 'found' },
   demand: { bg: 'hall', lines: ['항복하는 것이 살 길임을 깨우쳐 주고 오겠습니다.', '싸우지 않고 이기는 것이 으뜸이지요.'], sfx: 'win' }
@@ -39,14 +43,16 @@ Object.assign(SG.UI.CMD_SCENES, {
   riot: { bg: 'riot', lines: ['백성들이 횃불을 들고 관아로 몰려왔습니다! 민심을 돌보지 않으면 또 일어날 것입니다.'], sfx: 'fire' }
 });
 SG.UI.CMD_TITLE = { locust: '메뚜기 떼', plague: '역병', flood: '홍수', drought: '가뭄', quake: '지진', bumper: '풍년', riot: '반란', attack: '출진', agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수', relief: '민심 안정', conscript: '징병', train: '훈련', search: '인재 탐색', recruit: '등용', reward: '포상',
-  move: '이동', transport: '수송', trade: '교역', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고' };
+  move: '이동', transport: '수송', trade: '교역', rumor: '유언비어', sow: '이간', gift: '친선', ally: '동맹', demand: '항복 권고',
+  incite: '선동', arson: '방화', plot: '내응', ambush: '매복' };
 
 // ---- 배경 그림
 SG.UI.DISASTER_BASE = { locust: 'field', bumper: 'field', flood: 'field', drought: 'field', plague: 'village', riot: 'village', quake: 'wall' };
 // 그린 배경 그림이 있는 장면 (img/scene/<이름>.jpg, Higgsfield 로 그림). 없으면 아래 SVG 로 그린다
 SG.UI.SCENE_IMG = { field: 1, market: 1, wall: 1, village: 1, drill: 1, road: 1, night: 1,
   field2: 1, field3: 1, market2: 1, market3: 1, trade1: 1, trade2: 1, wall2: 1, wall3: 1, village2: 1, village3: 1,
-  drill2: 1, drill3: 1, drill4: 1, road2: 1, road3: 1, road4: 1, road5: 1, road6: 1, night2: 1, night3: 1 };
+  drill2: 1, drill3: 1, drill4: 1, road2: 1, road3: 1, road4: 1, road5: 1, road6: 1, night2: 1, night3: 1,
+  arson: 1, arson2: 1, incite: 1, incite2: 1, plot: 1, ambush: 1, ambush2: 1 };
 // 명령마다 그림 여러 장을 돌아가며 보여 준다 (같은 명령을 연달아 내려도 다른 그림)
 SG.UI.CMD_IMGS = {
   agri: ['field', 'field2', 'field3'], comm: ['market', 'market2', 'market3'], trade: ['trade1', 'trade2', 'market2'],
@@ -54,6 +60,7 @@ SG.UI.CMD_IMGS = {
   conscript: ['drill2', 'drill', 'drill4'], train: ['drill', 'drill3', 'drill4'],
   search: ['road', 'road2', 'road3'], recruit: ['road4', 'road2', 'road3'], move: ['road', 'road5'], transport: ['road6', 'road5'],
   rumor: ['night', 'night2', 'night3'], sow: ['night2', 'night3', 'night'],
+  incite: ['incite', 'incite2'], arson: ['arson', 'arson2'], plot: ['plot', 'night2'], ambush: ['ambush', 'ambush2'],
   reward: ['hall', 'hall2'], gift: ['hall2', 'hall3', 'hall'], ally: ['hall3', 'hall'], demand: ['hall', 'hall2']
 };
 SG.UI._imgNext = {};
@@ -398,9 +405,13 @@ SG.UI.showMilitary = function (o, before, r, target) {
 
 // 계략·외교: 명령을 낸 도시의 「○월 변화」에 한 줄씩 (acts[cid] = [{text, good}])
 SG.UI.noteAct = function (o, r, rows) {
-  if (['rumor', 'sow', 'gift', 'ally', 'demand'].indexOf(o.kind) < 0) return;
+  if (['rumor', 'sow', 'gift', 'ally', 'demand', 'incite', 'arson', 'plot', 'ambush'].indexOf(o.kind) < 0) return;
   var d = SG.UI.deltas(), ok = r.success !== false, text;
   if (o.kind === 'rumor') text = '유언비어 → ' + SG.cityName(o.cities[1]) + (ok ? ' 성공' : ' 실패');
+  else if (o.kind === 'incite') text = '선동 → ' + SG.cityName(o.cities[1]) + (ok ? ' 민란!' : ' 실패');
+  else if (o.kind === 'arson') text = '방화 → ' + SG.cityName(o.cities[1]) + (ok ? ' 불길!' : ' 실패');
+  else if (o.kind === 'plot') text = '내응 → ' + SG.name(o.offs[0]) + (ok ? ' 약속 (' + SG.PLOT_MONTHS + '개월)' : ' 거절');
+  else if (o.kind === 'ambush') text = '매복 → ' + SG.name(o.oid) + ' 복병 (' + SG.AMBUSH_MONTHS + '개월)';
   else if (o.kind === 'sow') {
     var lr = rows.filter(function (x) { return / 충성$/.test(x.label); })[0];
     text = '이간 → ' + SG.name(o.offs[0]) + (lr ? ' 충성 −' + Math.abs(lr.to - lr.from) : ' 실패');

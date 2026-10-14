@@ -84,10 +84,10 @@ SG.UI.renderPanel = function (el, cid) {
       h('div', { class: 'gov-chips' }, [
         h('span', { class: 'chip ' + md[1], text: '민심 ' + md[0] }),
         mine && SG.convoysTo && (SG.convoysTo(cid).length || SG.marchesTo(cid).length) ? (function () {
-          var g = 0, fd = 0, n = 0, offs = [];
-          SG.convoysTo(cid).concat(SG.marchesTo(cid)).forEach(function (v) { g += v.gold || 0; fd += v.food || 0; n += v.n || 0; offs = offs.concat(v.oids || []); });
+          var g = 0, fd = 0, n = 0, offs = [], mx = { inf: 0, cav: 0, arc: 0 };
+          SG.convoysTo(cid).concat(SG.marchesTo(cid)).forEach(function (v) { g += v.gold || 0; fd += v.food || 0; n += v.n || 0; offs = offs.concat(v.oids || []); if (v.mix) SG.TROOP_KEYS.forEach(function (t) { mx[t] += v.mix[t] || 0; }); });
           return h('span', { class: 'chip convoy', title: '이동·수송 중입니다. 턴 종료 뒤(다음 달) 도착합니다' + (offs.length ? ' — ' + offs.map(SG.name).join(', ') : ''),
-            text: '오는 중 ' + [offs.length ? '장수 ' + offs.length + '명' : '', n ? '병사 ' + SG.fmt(n) : '', g ? '금 ' + SG.fmt(g) : '', fd ? '식량 ' + SG.fmt(fd) : ''].filter(Boolean).join('·') });
+            text: '오는 중 ' + [offs.length ? '장수 ' + offs.length + '명' : '', n ? '병사 ' + SG.fmt(n) + ' (' + SG.mixText(mx) + ')' : '', g ? '금 ' + SG.fmt(g) : '', fd ? '식량 ' + SG.fmt(fd) : ''].filter(Boolean).join('·') });
         })() : null,
         gov ? h('span', { class: 'chip ' + (gr > 0 ? 'good' : gr < 0 ? 'warn' : ''), title: '태수의 정치에 따라 금 수입·가을걷이가 달라집니다', text: '다스림 ' + (gr >= 0 ? '+' : '') + gr + '%' + (SG.O(gov).cha >= 80 ? ' · 민심↑' : '') }) : null,
         th && th.front ? h('span', { class: 'chip ' + (th.max > c.soldiers ? 'bad' : 'warn'), text: th.max > c.soldiers ? '적이 더 많음' : '적과 맞닿음' }) : (c.owner ? h('span', { class: 'chip good', text: '후방' }) : null)
@@ -166,7 +166,7 @@ SG.UI.renderPanel = function (el, cid) {
     if (x.loy) staff.push(h('span', { class: 'ms-c ' + (x.loy > 0 ? 'up' : 'down') }, [SG.name(oid) + ' 충성 ', h('b', { text: (x.loy > 0 ? '+' : '−') + Math.abs(x.loy) })]));
   });
   var arr = mine && S.arrived && S.arrived[cid];
-  if (arr) staff.push(h('span', { class: 'ms-c up' }, ['도착 ', h('b', { text: [(arr.offs || []).length ? arr.offs.map(SG.name).join(', ') : '', arr.soldiers ? '병사 +' + SG.fmt(arr.soldiers) : '', arr.gold ? '금 +' + SG.fmt(arr.gold) : '', arr.food ? '식량 +' + SG.fmt(arr.food) : ''].filter(Boolean).join(' · ') })]));
+  if (arr) staff.push(h('span', { class: 'ms-c up' }, ['도착 ', h('b', { text: [(arr.offs || []).length ? arr.offs.map(SG.name).join(', ') : '', arr.soldiers ? '병사 +' + SG.fmt(arr.soldiers) + (arr.mix ? ' (' + SG.mixText(arr.mix) + ')' : '') : '', arr.gold ? '금 +' + SG.fmt(arr.gold) : '', arr.food ? '식량 +' + SG.fmt(arr.food) : ''].filter(Boolean).join(' · ') })]));
   dout.forEach(function (m) { staff.push(h('span', { class: 'ms-c' }, [SG.name(m[0]) + ' → ', h('b', { text: SG.cityName(m[1]) })])); });
   (D && D.acts && D.acts[cid] || []).forEach(function (a) { staff.push(h('span', { class: 'ms-c act ' + (a.good ? 'up' : 'down') }, [h('b', { text: a.text })])); });
   // 남의 도시: 줄어든 것이 우리에게 좋은 일 → 색을 뒤집는다

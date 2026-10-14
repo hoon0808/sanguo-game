@@ -56,8 +56,10 @@ SG.numJong = function (num) {
 };
 SG.josa = function (text) {
   if (!text || text.indexOf('(') < 0) return text;
-  return String(text).replace(/([가-힣]|[0-9][0-9,]*)(이\(가\)|을\(를\)|은\(는\)|과\(와\)|와\(과\)|\(으\)로|\(이\))/g, function (m, ch, j) {
+  // 「병사 9,750(步 …)을(를)」처럼 괄호 설명이 끼어 있으면 괄호 앞 글자로 정한다
+  return String(text).replace(/([가-힣]|[0-9][0-9,]*)(\([^()]*\))?(이\(가\)|을\(를\)|은\(는\)|과\(와\)|와\(과\)|\(으\)로|\(이\))/g, function (m, ch, par, j) {
     var jong = /^[0-9]/.test(ch) ? SG.numJong(ch) : (ch.charCodeAt(0) - 0xAC00) % 28, pair = SG.JOSA[j];
+    ch += par || '';
     if (j === '(으)로') return ch + (jong === 0 || jong === 8 ? '로' : '으로');
     if (j === '(이)') return ch + (jong ? '이' : '');
     return ch + (jong ? pair[0] : pair[1]);

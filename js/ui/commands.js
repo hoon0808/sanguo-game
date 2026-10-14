@@ -361,6 +361,27 @@ SG.UI.slider = function (label, max, val, onChange) {
   return row;
 };
 
+// 병종별 병사 고르기 (보병·기병·궁병 슬라이더 + 합계). get() → {inf, cav, arc}
+SG.UI.troopSliders = function (cid) {
+  var p = SG.cityTroops(cid), rows = {}, tot = h('b', { text: '0' });
+  var wrap = h('div', { class: 'troop-sl' });
+  function sum() { var n = 0; SG.TROOP_KEYS.forEach(function (t) { if (rows[t]) n += rows[t].get(); }); tot.textContent = SG.fmt(n); }
+  wrap.appendChild(h('div', { class: 'tsl-h' }, [h('span', { text: '데려갈 병사 ' }), tot,
+    h('button', { type: 'button', class: 'btn small', text: '모두', onclick: function () { SG.TROOP_KEYS.forEach(function (t) { if (rows[t]) rows[t].set(p[t]); }); sum(); } }),
+    h('button', { type: 'button', class: 'btn small', text: '절반', onclick: function () { var m = SG.mixOf(cid, Math.floor((p.inf + p.cav + p.arc) / 200) * 100); SG.TROOP_KEYS.forEach(function (t) { if (rows[t]) rows[t].set(m[t]); }); sum(); } }),
+    h('button', { type: 'button', class: 'btn small', text: '0', onclick: function () { SG.TROOP_KEYS.forEach(function (t) { if (rows[t]) rows[t].set(0); }); sum(); } })]));
+  SG.TROOP_KEYS.forEach(function (t) {
+    if (p[t] <= 0) return;
+    rows[t] = SG.UI.slider(SG.TROOPS[t].h + ' ' + SG.TROOPS[t].n + ' (' + SG.fmt(p[t]) + ')', p[t], 0, sum);
+    rows[t].classList.add('tsl-' + t);
+    rows[t].querySelector('input').step = 10;
+    wrap.appendChild(rows[t]);
+  });
+  if (!Object.keys(rows).length) wrap.appendChild(h('p', { class: 'note', text: '이 도시에는 병사가 없습니다.' }));
+  wrap.get = function () { var m = {}; SG.TROOP_KEYS.forEach(function (t) { m[t] = rows[t] ? rows[t].get() : 0; }); return m; };
+  return wrap;
+};
+
 SG.UI.cmdMove = async function (cid) {
   var S = SG.S, c = S.cities[cid];
   var dests = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === c.owner; });
@@ -373,7 +394,7 @@ SG.UI.cmdMove = async function (cid) {
     var i = picked.indexOf(o); if (i >= 0) picked.splice(i, 1); else picked.push(o);
     card.classList.toggle('sel', picked.indexOf(o) >= 0);
   } });
-  var sS = SG.UI.slider('데려갈 병사', c.soldiers, 0), sG = SG.UI.slider('가져갈 금', c.gold, 0), sF = SG.UI.slider('가져갈 식량', c.food, 0);
+  var sS = SG.UI.troopSliders(cid), sG = SG.UI.slider('가져갈 금', c.gold, 0), sF = SG.UI.slider('가져갈 식량', c.food, 0);
   var body = h('div', null, [
     SG.UI.brief('장수가 병사·금·식량을 가지고 옮겨 가 그 도시에 머뭅니다 · 길을 가는 동안이라 다음 달(턴 종료 뒤)에 도착합니다 · 장수는 그대로 두고 물자만 보내려면 「군사 → 수송」'),
     h('div', { class: 'field' }, [h('label', { text: '목적지' }), sel]),

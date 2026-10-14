@@ -1560,3 +1560,19 @@ html.compact .bt-sup > span { padding: 2px 6px 2px 3px; }
 /* 군사 */
 .bl-h .bl-adv { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--brz); white-space: nowrap; }
 .chip-b.strat { background: #2c5a7a; color: #e8f2fa; border-color: #2c5a7a; }
+
+/* 이동: 병종별 병사 고르기 */
+.troop-sl { margin: 8px 0; padding: 8px 10px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+.troop-sl .tsl-h { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; font-size: 14px; }
+.troop-sl .tsl-h b { font-variant-numeric: tabular-nums; margin-right: auto; }
+.troop-sl .field { margin: 4px 0; }
+.troop-sl .tsl-inf label { color: var(--accent); }
+.troop-sl .tsl-cav label { color: var(--bronze); }
+.troop-sl .tsl-arc label { color: var(--seal); }
+
+/* 싸움 직전 (내응·매복) */
+.prebattle .pb-img { height: 150px; border-radius: 6px; background-size: cover; background-position: center; margin-bottom: 10px; }
+.prebattle .pb-line { margin: 6px 0; font-size: 15px; line-height: 1.55; padding-left: 10px; border-left: 3px solid var(--bronze); }
+.prebattle.good .pb-line { border-left-color: var(--accent); }
+.prebattle.bad .pb-line { border-left-color: var(--seal); }
+html.compact .prebattle .pb-img { height: 90px; }

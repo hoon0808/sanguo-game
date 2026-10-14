@@ -195,3 +195,16 @@ SG.ui.battleReport = async function (atk, def, res) {
   sc.skip = true;
   return v;
 };
+
+// 싸움 직전: 계략으로 꾸며 둔 내응·매복이 터진다
+SG.ui.preBattle = async function (atk, def, pre) {
+  var S = SG.S, good = pre.turned.length ? atk.fid === S.player : pre.ambush ? def.fid === S.player : false;
+  var lines = pre.log.map(function (l) { return h('p', { class: 'pb-line', text: l }); });
+  var img = pre.ambush ? 'ambush' : 'plot';
+  SG.UI.sfx(pre.ambush ? 'drum' : 'confuse');
+  await SG.UI.modal({ title: pre.turned.length && pre.ambush ? '내응과 매복!' : pre.turned.length ? '내응!' : pre.ambush ? '매복!' : '싸움 직전', icon: pre.ambush ? 'ambush' : 'plot',
+    body: h('div', { class: 'prebattle ' + (good ? 'good' : 'bad') }, [
+      h('div', { class: 'pb-img', style: { backgroundImage: 'url(img/scene/' + img + '.jpg)' } }),
+      h('div', { class: 'pb-body' }, lines)
+    ]), buttons: [{ label: '싸움으로', value: true, cls: 'primary' }] });
+};

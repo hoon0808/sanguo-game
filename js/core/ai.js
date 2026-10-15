@@ -108,12 +108,34 @@ SG.AI.cityDefense = function (cid) {
 SG.AI.military = async function (fid, domesticOnly) {
   var cities = SG.shuffle(SG.citiesOf(fid));
   var dist = SG.AI.frontDistance(fid);
-  // 후방 → 전방으로 병력·장수 보내기
+  // 전방 도시마다 모자라는 병사 (이미 길 위에서 오고 있는 병사는 뺀다)
+  var gap = {}, S = SG.S;
+  cities.forEach(function (x) {
+    if (dist[x] !== 0) return;
+    var coming = (SG.marchesTo ? SG.marchesTo(x) : []).filter(function (v) { return v.fid === fid; }).reduce(function (t, v) { return t + (v.n || 0); }, 0);
+    gap[x] = SG.garrisonWant(x) * 1.1 - S.cities[x].soldiers - coming;
+  });
+  // 가장 급한 전방 도시 (멀수록 덜 고른다: 모자람 ÷ (걸리는 달 + 1)), 4달 넘게 걸리면 안 감
+  // 난이도 쉬움의 컴퓨터는 예전처럼 한 걸음씩만 (far 0)
+  var far = SG.aiMul ? SG.aiMul(fid, 'far') : 1;
+  function pickFront(cid, minGap) {
+    if (!far) return null;
+    var best = null, bs = 0;
+    Object.keys(gap).forEach(function (x) {
+      if (x === cid || gap[x] < minGap) return;
+      var m = SG.travelMonths ? SG.travelMonths(fid, cid, x) : 0;
+      if (!m || m > 4) return;
+      var sc = gap[x] / (m + 1);
+      if (sc > bs) { bs = sc; best = x; }
+    });
+    return best;
+  }
+  // 후방 → 전방으로 병력·장수 보내기: 급한 전방 도시가 있으면 멀어도 곧장 그리로 (도시 하나 건널 때마다 한 달), 없으면 한 걸음 앞 도시로
   cities.forEach(function (cid) {
-    var c = SG.S.cities[cid], d = dist[cid];
+    var c = S.cities[cid], d = dist[cid];
     if (d === undefined || d === 0) return;
     var offs = SG.readyOfficers(cid);
-    var next = SG.ADJ[cid].filter(function (n) { return SG.S.cities[n].owner === fid && dist[n] === d - 1; })[0];
+    var next = SG.ADJ[cid].filter(function (n) { return S.cities[n].owner === fid && dist[n] === d - 1; })[0];
     if (!next || !offs.length) return;
     var keep = SG.officersIn(cid, fid).length > 1;
     if (c.soldiers > 4000 || offs.length > 2) {
@@ -121,8 +143,27 @@ SG.AI.military = async function (fid, domesticOnly) {
       var movers = keep ? offs.slice(0, Math.max(1, offs.length - 1)) : [];
       if (!movers.length) return;
       var n = Math.floor(c.soldiers * 0.7);
-      SG.cmd.move(cid, movers, next, n, Math.floor(c.gold * 0.3), Math.floor(Math.max(0, c.food - 1500) * 0.6));
+      var to = pickFront(cid, 1500) || next;
+      var r = SG.cmd.move(cid, movers, to, n, Math.floor(c.gold * 0.3), Math.floor(Math.max(0, c.food - 1500) * 0.6));
+      if (r && r.ok && gap[to] !== undefined) gap[to] -= n;
     }
+  });
+  // 식량: 곳간이 넘치는 후방 도시가 식량이 모자란 전방 도시로 수레를 보낸다 (장수는 제자리)
+  cities.forEach(function (cid) {
+    var c = S.cities[cid];
+    if (!far || !dist[cid] || !SG.cmd.transport || SG.cmdUsed(cid, 'transport')) return;
+    var spareF = c.food - Math.ceil(c.soldiers / 100) * 12 - 5000;
+    if (spareF < 3000) return;
+    var best = null, bs = 0;
+    cities.forEach(function (x) {
+      if (dist[x] !== 0) return;
+      var t = S.cities[x], short = Math.ceil(t.soldiers / 100) * 6 - t.food;
+      var m = SG.travelMonths(fid, cid, x);
+      if (short > 1000 && m && m <= 4 && short / (m + 1) > bs) { bs = short / (m + 1); best = x; }
+    });
+    if (!best) return;
+    var carrier = SG.readyOfficers(cid).sort(function (a, b) { return SG.O(a).pol - SG.O(b).pol; })[0];
+    if (carrier) SG.cmd.transport(cid, carrier, cid, best, 0, Math.min(spareF, Math.ceil(S.cities[best].soldiers / 100) * 6 - S.cities[best].food + 2000), 0);
   });
   if (domesticOnly) return;
 

@@ -93,6 +93,8 @@ SG.UI.Map.prototype.build = function () {
     g.addEventListener('mouseleave', function () { self.tip.style.display = 'none'; });
     self.cityEls[c.id] = g;
   });
+  // 길 위의 부대·수레 (도시 위에 그려 눌러 볼 수 있게)
+  this.gRoad = svg('g', { class: 'road-units' }, root);
   this.wrap.appendChild(root);
   // 분위기: 흘러가는 구름 그림자, 테두리, 나침반, 확대 단추, 제목 두루마리
   this.wrap.appendChild(h('div', { class: 'map-season' }));
@@ -346,6 +348,7 @@ SG.UI.Map.prototype.update = function () {
     self.roadEls[k].classList.toggle('hl', !!self.selected && (p[0] === self.selected || p[1] === self.selected));
   });
   this.drawTerritory();
+  this.drawRoad();
   // 계절빛 (1~3 봄, 4~6 여름, 7~9 가을, 10~12 겨울 — 위쪽 계절 인장과 같다)
   this.wrap.setAttribute('data-season', ['spring', 'summer', 'autumn', 'winter'][Math.floor((S.month - 1) / 3)]);
   // 제목 두루마리
@@ -366,6 +369,71 @@ SG.UI.Map.prototype.update = function () {
     });
 };
 SG.UI.Map.prototype.select = function (cid) { this.selected = cid; this.update(); };
+
+// 길 위에 있는 부대(軍)·수레(輸): 지금 있는 자리에 세력 색 표지, 우리 부대는 남은 길을 점선으로. 누르거나 올리면 자세히
+SG.UI.shortNum = function (n) { return n >= 9950 ? (n / 10000).toFixed(1) + '만' : n >= 1000 ? Math.floor(n / 1000) + '천' : String(n); };
+SG.UI.Map.prototype.drawRoad = function () {
+  var self = this, S = SG.S, g = this.gRoad;
+  if (!g) return;
+  while (g.firstChild) g.removeChild(g.firstChild);
+  if (!SG.onRoad) return;
+  var slot = {}, routes = svg('g', {}, g), marks = svg('g', {}, g);
+  SG.onRoad().forEach(function (x) {
+    var v = x.v, F = S.forces[v.fid], A = SG.CITIES[x.path[x.seg]], B = SG.CITIES[x.path[x.seg + 1]];
+    if (!F || !A || !B) return;
+    var mine = !!S.player && v.fid === S.player;
+    var dx = B.x - A.x, dy = B.y - A.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var px = A.x + dx * x.t, py = A.y + dy * x.t;
+    // 같은 자리에 여럿이면 길 옆으로 비켜 세운다
+    var key = x.path[x.seg] + '|' + x.path[x.seg + 1] + '|' + Math.round(x.t * 3), k = slot[key] = (slot[key] || 0) + 1;
+    var off = (k - 1) * 15 * (k % 2 ? 1 : -1);
+    px += -dy / L * off; py += dx / L * off;
+    if (mine) {
+      var pts = [[px, py]].concat(x.path.slice(x.seg + 1).map(function (c) { return [SG.CITIES[c].x, SG.CITIES[c].y]; }));
+      var ptxt = pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+      svg('polyline', { points: ptxt, class: 'ru-route-c' }, routes);
+      var line = svg('polyline', { points: ptxt, class: 'ru-route' }, routes);
+      line.style.stroke = F.color;
+      // 도착할 도시에 작은 고리
+      var D = SG.CITIES[x.path[x.path.length - 1]];
+      var ring = svg('circle', { cx: D.x, cy: D.y + 4, r: 22, class: 'ru-dest' }, routes);
+      ring.style.stroke = F.color;
+    }
+    var u = svg('g', { class: 'ru ' + x.kind + (mine ? ' mine' : ''), transform: 'translate(' + px.toFixed(1) + ',' + py.toFixed(1) + ')' }, marks);
+    if (x.kind === 'march') {
+      var fl = svg('path', { d: 'M-1,-9 L-1,-22 Q5,-23.5 11,-21 L8.5,-18 L11,-15 Q5,-17 -1,-16', class: 'ru-flag' }, u);
+      fl.style.fill = F.color;
+    } else {
+      svg('circle', { cx: -6, cy: 8, r: 3, class: 'ru-wheel' }, u);
+      svg('circle', { cx: 6, cy: 8, r: 3, class: 'ru-wheel' }, u);
+    }
+    var b = svg(x.kind === 'march' ? 'circle' : 'rect', x.kind === 'march' ? { r: 9, class: 'ru-b' } : { x: -10, y: -8, width: 20, height: 15, rx: 3, class: 'ru-b' }, u);
+    b.style.fill = F.color;
+    var c = svg('text', { y: 3.6, 'text-anchor': 'middle', class: 'ru-c' }, u);
+    c.textContent = x.kind === 'march' ? (v.n > 0 ? '軍' : '將') : '輸';
+    var lab = x.kind === 'march' ? (v.n > 0 ? SG.UI.shortNum(v.n) : '') : '';
+    if (lab) { var tn = svg('text', { x: 12, y: 4, 'text-anchor': 'start', class: 'ru-n' }, u); tn.textContent = lab; }
+    if (x.left > 1) {
+      svg('circle', { cx: -10, cy: -8, r: 6, class: 'ru-lb' }, u);
+      var tl = svg('text', { x: -10, y: -5.3, 'text-anchor': 'middle', class: 'ru-l' }, u); tl.textContent = x.left;
+    }
+    function tip(e) {
+      var who = (v.oids || []).filter(function (o) { return S.off[o]; }).map(SG.name);
+      var goods = [v.gold ? '금 ' + SG.fmt(v.gold) : '', v.food ? '식량 ' + SG.fmt(v.food) : ''].filter(Boolean).join(' · ');
+      self.tip.innerHTML = '<b>' + SG.forceName(v.fid) + (x.kind === 'march' ? ' 행군' : ' 수레') + '</b><br>' +
+        (who.length ? who.join(', ') + '<br>' : '') +
+        (v.n > 0 ? '병사 ' + SG.fmt(v.n) + (v.mix ? ' <span class="sub">(' + SG.mixText(v.mix) + ')</span>' : '') + '<br>' : '') +
+        (goods ? goods + '<br>' : '') +
+        x.path.map(function (cid) { return SG.CITIES[cid].n; }).join(' → ') + '<br><span class="sub">' + (x.left <= 1 ? '다음 달 도착' : x.left + '달 뒤 도착') + '</span>';
+      self.tip.style.display = 'block';
+      self.moveTip(e);
+    }
+    u.addEventListener('mouseenter', function (e) { if (!SG.UI.isTouch()) tip(e); });
+    u.addEventListener('mousemove', function (e) { self.moveTip(e); });
+    u.addEventListener('mouseleave', function () { self.tip.style.display = 'none'; });
+    u.addEventListener('click', function (e) { e.stopPropagation(); if (!self.dragged) tip(e); });
+  });
+};
 
 SG.UI.Map.prototype.showTip = function (cid, e) {
   var c = SG.S.cities[cid], C = SG.CITIES[cid];

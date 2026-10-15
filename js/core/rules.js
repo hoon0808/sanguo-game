@@ -248,7 +248,7 @@ SG.cmd.move = function (cid, oids, dest, soldiers, gold, food) {
   SG.takeTroops(c, mix, cid);
   c.gold -= gold; c.food -= food;
   oids.forEach(function (o) { SG.S.off[o].march = dest; SG.S.off[o].acted = true; });
-  (SG.S.marches = SG.S.marches || []).push({ from: cid, to: dest, fid: c.owner, oids: oids.slice(), mix: mix, n: soldiers, train: c.train, morale: c.morale, gold: gold, food: food, arrive: SG.monthNow() + months, months: months });
+  (SG.S.marches = SG.S.marches || []).push({ from: cid, to: dest, fid: c.owner, oids: oids.slice(), mix: mix, n: soldiers, train: c.train, morale: c.morale, gold: gold, food: food, arrive: SG.monthNow() + months, months: months, path: route });
   var extra = [];
   if (soldiers) extra.push('병사 ' + SG.fmt(soldiers));
   if (gold) extra.push('금 ' + SG.fmt(gold));
@@ -282,7 +282,7 @@ SG.cmd.transport = function (cid, oid, src, dest, soldiers, food, gold) {
   SG.takeTroops(a, mix, src); SG.putTroops(b, mix, dest);
   // 금·식량은 수레에 실려 길을 가므로 다음 달(턴이 지난 뒤)에 도착한다
   a.food -= food; a.gold -= gold;
-  if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food, months);
+  if (food || gold) SG.addConvoy(src, dest, a.owner, gold, food, months, route);
   var goods = [gold ? '금 ' + SG.fmt(gold) : '', food ? '식량 ' + SG.fmt(food) : ''].filter(Boolean).join('·');
   var what = [soldiers ? '병사 ' + SG.fmt(soldiers) + '(' + SG.mixText(mix) + ')' : '', goods].filter(Boolean).join('·');
   // 병사는 장수가 이끈다: 데려올 때는 장수가 그 도시에 가서 병사를 이끌고 돌아온다
@@ -328,11 +328,26 @@ SG.deliverMarches = function () {
   });
 };
 
+// ---- 길 위에 있는 부대·수레가 지금 어디쯤인지 (지도에 그리기용). 떠난 달에는 첫 길의 절반쯤, 한 달 지날 때마다 도시 하나씩 나아간다
+SG.onRoad = function () {
+  var S = SG.S, now = SG.monthNow(), out = [];
+  function add(v, kind) {
+    var path = v.path && v.path.length > 1 ? v.path : [v.from, v.to];
+    var months = Math.max(1, v.months || path.length - 1), left = Math.max(1, (v.arrive || now + 1) - now);
+    var done = months - left, hops = path.length - 1;
+    var pos = SG.clamp((done + 0.5) * hops / months, 0.15, hops - 0.15), seg = Math.min(hops - 1, Math.floor(pos));
+    out.push({ v: v, kind: kind, path: path, seg: seg, t: pos - seg, left: left });
+  }
+  (S.marches || []).forEach(function (v) { add(v, 'march'); });
+  (S.convoys || []).forEach(function (v) { add(v, 'convoy'); });
+  return out;
+};
+
 // ---- 수레 (금·식량이 길 위에 있는 동안)
-SG.addConvoy = function (from, to, fid, gold, food, months) {
+SG.addConvoy = function (from, to, fid, gold, food, months, path) {
   var S = SG.S;
   months = months || 1;
-  (S.convoys = S.convoys || []).push({ from: from, to: to, fid: fid, gold: gold || 0, food: food || 0, arrive: SG.monthNow() + months, months: months });
+  (S.convoys = S.convoys || []).push({ from: from, to: to, fid: fid, gold: gold || 0, food: food || 0, arrive: SG.monthNow() + months, months: months, path: path || [from, to] });
 };
 SG.convoysTo = function (cid) {
   return (SG.S.convoys || []).filter(function (v) { return v.to === cid; });

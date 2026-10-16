@@ -74,17 +74,19 @@ SG.UI.Map.prototype.build = function () {
   this.gCities = svg('g', {}, root);
   SG.CITY_LIST.forEach(function (c) {
     var g = svg('g', { class: 'city-g sz' + c.size, transform: 'translate(' + c.x + ',' + c.y + ')' }, self.gCities);
-    var k = [0, 0.86, 1, 1.18][c.size], W = 36 * k, top = self.castle(g, c.size, k);
+    var k = [0, 0.86, 1, 1.18][c.size], W = 36 * k, top = self.castle(g, c.size, k, c.id);
     g._w = W; g._h = 16 * k;
     var pl = svg('g', { class: 'plaque' }, g);
-    svg('rect', { x: -14, y: -3 * k - 6, width: 28, height: 11, rx: 1.5, class: 'base' }, pl);
-    var sol = svg('text', { x: 0, y: -3 * k + 2.6, 'text-anchor': 'middle', class: 'soldier' }, pl);
+    // 병력 현판은 성문 앞 성벽 아래쪽에 건다
+    var pb = 7 * k + 4;
+    svg('rect', { x: -14, y: pb - 11, width: 28, height: 11, rx: 1.5, class: 'base' }, pl);
+    var sol = svg('text', { x: 0, y: pb - 2.8, 'text-anchor': 'middle', class: 'soldier' }, pl);
     // 깃발
     var fl = svg('g', { class: 'flag-g', transform: 'translate(0,' + top + ')' }, g);
     svg('line', { x1: 0, y1: 0, x2: 0, y2: -13, class: 'pole' }, fl);
     svg('path', { d: 'M0.5,-13 Q6,-14.5 12,-12.5 L9.5,-9.5 L12,-6.5 Q6,-8.5 0.5,-7 Z', class: 'flag' }, fl);
     var cap = svg('text', { x: -4, y: top - 6, 'text-anchor': 'end', class: 'cap' }, g);
-    var lbl = svg('text', { x: 0, y: 6 * k + 15, 'text-anchor': 'middle', class: 'lbl' }, g);
+    var lbl = svg('text', { x: 0, y: pb + 15, 'text-anchor': 'middle', class: 'lbl' }, g);
     lbl.textContent = c.n;
     g._sol = sol; g._cap = cap;
     g.addEventListener('click', function (e) { e.stopPropagation(); if (!self.dragged && self.opt.onClick) self.opt.onClick(c.id); });
@@ -218,41 +220,22 @@ SG.UI.Map.prototype.zoomBy = function (f) {
   this.applyVB();
 };
 
-// 성 그림. 기준 크기(보통 성)로 그리고 k 배로 줄이거나 키운다. 깃대가 꽂힐 높이를 돌려준다.
-SG.UI.Map.prototype.castle = function (g, size, k) {
-  svg('ellipse', { cx: 0, cy: 7 * k, rx: 18 * k + 9, ry: 6 * k + 3, class: 'ring' }, g);
-  svg('ellipse', { cx: 2, cy: 6.5 * k, rx: 18 * k + 5, ry: 4 * k, class: 'gshadow' }, g);
-  var b = svg('g', { class: 'castle', transform: 'scale(' + k + ')' }, g), top;
-  function roof(x, y, w, hgt) { // 처마가 살짝 들린 지붕
-    svg('path', { d: 'M' + (x - w / 2 - 2) + ',' + y + ' L' + (x - w / 2 + 2) + ',' + (y - hgt) + ' L' + (x + w / 2 - 2) + ',' + (y - hgt) +
-      ' L' + (x + w / 2 + 2) + ',' + y + ' Q' + x + ',' + (y - 2.2) + ' ' + (x - w / 2 - 2) + ',' + y + ' Z', class: 'roof' }, b);
-  }
-  if (size === 3) {        // 2층 누각
-    svg('rect', { x: -7, y: -23, width: 14, height: 14, class: 'stone' }, b);
-    roof(0, -22, 22, 5.5);
-    svg('rect', { x: -4.5, y: -33, width: 9, height: 6, class: 'stone' }, b);
-    roof(0, -32, 15, 5);
-    top = -37;
-  }
-  if (size >= 2) {         // 모서리 각루
-    [-17, 17].forEach(function (x) {
-      svg('rect', { x: x - 4, y: -15, width: 8, height: 21, class: 'stone' }, b);
-      roof(x, -14.5, 10, 4.5);
-    });
-  }
-  svg('rect', { x: -18, y: -10, width: 36, height: 16, class: 'wall' }, b);
-  for (var i = 0; i < 7; i++) svg('rect', { x: -16.5 + i * 5.1, y: -12.6, width: 2.8, height: 2.8, class: 'crn' }, b);
-  if (size === 2) {        // 성문 위 문루
-    svg('rect', { x: -6.5, y: -17, width: 13, height: 7, class: 'stone' }, b);
-    roof(0, -16.5, 16, 5);
-    top = -21.5;
-  } else if (size === 1) { // 망루
-    svg('rect', { x: -4, y: -16, width: 8, height: 6, class: 'stone' }, b);
-    svg('path', { d: 'M-7.5,-15.5 L0,-21 L7.5,-15.5 Q0,-17.5 -7.5,-15.5 Z', class: 'roof' }, b);
-    top = -21;
-  }
-  svg('path', { d: 'M-4,6 L-4,3 Q0,0 4,3 L4,6 Z', class: 'gate' }, b);
-  return top * k;
+// 성 그림: 크기별로 그린 그림 두 장(img/castle, Higgsfield 공필화풍, 배경 따냄) 중 도시마다 하나.
+// 성 아래 땅에는 세력 색 띠를 깔고, 위에 깃발을 꽂는다. 깃대가 꽂힐 높이를 돌려준다.
+SG.UI.CASTLE_IMG = { 1: ['s1a', 's1b'], 2: ['s2a', 's2b'], 3: ['s3a', 's3b'] };
+SG.UI.CASTLE_AR = { s1a: 188 / 260, s1b: 184 / 260, s2a: 176 / 260, s2b: 174 / 260, s3a: 180 / 260, s3b: 172 / 260 };
+SG.UI.CASTLE_W = [0, 44, 54, 64];
+SG.UI.Map.prototype.castle = function (g, size, k, cid) {
+  var names = SG.UI.CASTLE_IMG[size] || SG.UI.CASTLE_IMG[2], hsh = 0;
+  for (var i = 0; i < (cid || '').length; i++) hsh = (hsh * 31 + cid.charCodeAt(i)) % 9973;
+  var n = names[hsh % names.length], W = SG.UI.CASTLE_W[size] || 50, H = W * SG.UI.CASTLE_AR[n], base = 7 * k + 4;
+  svg('ellipse', { cx: 0, cy: base - 3, rx: W / 2 + 8, ry: H * 0.32 + 5, class: 'ring' }, g);
+  svg('ellipse', { cx: 0, cy: base - 4, rx: W / 2 + 2, ry: H * 0.27 + 2, class: 'own' }, g);
+  svg('ellipse', { cx: 2, cy: base - 2, rx: W / 2 - 1, ry: H * 0.18, class: 'gshadow' }, g);
+  var im = svg('image', { x: -W / 2, y: base - H, width: W, height: H, preserveAspectRatio: 'xMidYMax meet', class: 'castle' }, g);
+  im.setAttribute('href', 'img/castle/' + n + '.png');
+  // 깃대는 성 한가운데(성벽 안쪽)에 세운다
+  return base - H * 0.52;
 };
 
 // 세력 영토: 육지 칸마다 가장 가까운 도시(큰 성일수록 넓게)의 주인 색. 경계는 진하게.
@@ -333,12 +316,13 @@ SG.UI.Map.prototype.update = function () {
     var f = cs.owner ? S.forces[cs.owner] : null;
     var base = g.querySelector('.base');
     base.style.fill = f ? f.color : 'var(--land-2)';
-    [].forEach.call(g.querySelectorAll('.roof'), function (r) { r.style.fill = f ? SG.UI.shade(f.color, -12) : ''; });
+    var own = g.querySelector('.own'); if (own) { own.style.fill = f ? f.color : 'transparent'; own.style.stroke = f ? SG.UI.shade(f.color, -25) : 'transparent'; }
     g.querySelector('.flag').style.fill = f ? f.color : '';
     g.classList.toggle('empty', !f);
     var n = cs.soldiers;
     g._sol.textContent = n <= 0 ? '' : n >= 9950 ? (n / 10000).toFixed(1) + '만' : n >= 1000 ? Math.floor(n / 1000) + '천' : n;
     g._sol.style.fill = f ? '#fff' : 'var(--muted)';
+    g.querySelector('.plaque').style.display = n > 0 ? '' : 'none';
     g._cap.textContent = f && f.capital === c.id ? '★' : '';
     g.classList.toggle('sel', self.selected === c.id);
     g.classList.toggle('mine', !!S.player && cs.owner === S.player);

@@ -1598,3 +1598,12 @@ html.compact .prebattle .pb-img { height: 90px; }
 .ru-route-c { fill: none; stroke: #fff6dc; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; opacity: .55; pointer-events: none; }
 .ru-route { stroke-width: 3; opacity: 1; stroke-linejoin: round; }
 .ru-dest { fill: none; stroke-width: 2.5; stroke-dasharray: 4 4; opacity: .9; pointer-events: none; }
+
+/* 지도 성: 그린 그림 + 세력 색 땅 띠 */
+.city-g .own { opacity: .5; stroke-width: 1.4; }
+.city-g image.castle { filter: drop-shadow(0 1px 1.2px rgba(20, 14, 6, .55)); }
+.city-g.empty .castle { opacity: .85; filter: grayscale(.55) drop-shadow(0 1px 1px rgba(20, 14, 6, .4)); }
+.city-g:hover image.castle, .city-g.sel image.castle { filter: brightness(1.1) drop-shadow(0 0 3px rgba(255, 230, 160, .95)); }
+.city-g.mine .own { opacity: .62; }
+:root[data-theme="dark"] .city-g image.castle { filter: brightness(.86) drop-shadow(0 1px 1.2px rgba(0, 0, 0, .7)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .city-g image.castle { filter: brightness(.86) drop-shadow(0 1px 1.2px rgba(0, 0, 0, .7)); } }

@@ -171,6 +171,40 @@ SG.DUEL_ACTS = {
   special: { n: '필살', h: '必', desc: '기세 60 이상. 모은 기세를 모두 써서 큰 일격. 방어도 뚫는다' },
   retreat: { n: '물러나기', h: '退', desc: '말머리를 돌려 달아난다. 진 것이 되지만 잡히지는 않는다' }
 };
+// ---- 일기토 무기와 묘사 (연의에 나오는 이름난 무기는 그대로, 나머지는 잘 다루는 병종으로)
+SG.WEAPONS = {
+  guanyu: ['청룡언월도', 'blade'], zhangfei: ['장팔사모', 'spear'], lvbu: ['방천화극', 'spear'], zhaoyun: ['애각창', 'spear'],
+  machao: ['호두점강창', 'spear'], huangzhong: ['봉취도', 'blade'], dianwei: ['쌍철극', 'spear'], xuchu: ['대감도', 'blade'],
+  liubei: ['쌍고검', 'sword'], taishici: ['단극', 'spear'], ganning: ['철쇄 대도', 'blade'], sunce: ['패왕창', 'spear'],
+  xiahoudun: ['대도', 'blade'], huaxiong: ['대도', 'blade'], weiyan: ['대도', 'blade'], pangde: ['대도', 'blade'],
+  zhangliao: ['월아극', 'spear'], wenchou: ['장창', 'spear'], yanliang: ['대도', 'blade'], jiangwei: ['창', 'spear']
+};
+SG.weaponOf = function (oid) {
+  if (SG.WEAPONS[oid]) return { n: SG.WEAPONS[oid][0], k: SG.WEAPONS[oid][1] };
+  var blade = SG.itemsOf ? SG.itemsOf(oid).filter(function (id) { return SG.ITEMS[id].k === 'blade'; })[0] : null;
+  if (blade) return { n: SG.ITEMS[blade].n, k: 'sword' };
+  var t = SG.apt ? SG.apt(oid) : 'inf';
+  return t === 'cav' ? { n: '장창', k: 'spear' } : t === 'arc' ? { n: '장검', k: 'sword' } : { n: '대도', k: 'blade' };
+};
+// 한 합을 두 줄로: [i=0 이 한 것, i=1 이 한 것]
+SG.duelMoveText = function (oid, act, hitTaken, opAct) {
+  var w = SG.weaponOf(oid), n = SG.name(oid), wn = w.n, P = SG.rand();
+  var verbs = {
+    atk: w.k === 'spear' ? ['이(가) ' + wn + '(으)로 번개같이 찔러 들어갔다', '이(가) ' + wn + '을(를) 연달아 내질렀다']
+      : w.k === 'blade' ? ['이(가) ' + wn + '을(를) 비스듬히 베어 들어갔다', '이(가) ' + wn + '(으)로 말 위에서 쳐 들어갔다']
+      : ['이(가) ' + wn + '을(를) 뽑아 빠르게 베었다', '이(가) ' + wn + '(으)로 틈을 노려 찔렀다'],
+    power: w.k === 'blade' ? ['이(가) ' + wn + '을(를) 머리 위로 높이 들어 온 힘으로 내리쳤다', '이(가) 말을 박차며 ' + wn + '을(를) 크게 휘둘렀다']
+      : ['이(가) 말을 몰아 달려들며 ' + wn + '에 온 힘을 실었다', '이(가) 고함과 함께 ' + wn + '을(를) 깊숙이 내질렀다'],
+    guard: ['이(가) ' + wn + '을(를) 비껴 들고 막아 섰다', '이(가) 말머리를 틀며 ' + wn + '(으)로 받아 냈다'],
+    focus: ['이(가) 말을 물려 숨을 고르며 기세를 모았다', '이(가) 눈을 부릅뜨고 기합을 내질렀다'],
+    special: ['의 필살 일격! ' + wn + '이(가) 번개처럼 떨어졌다', '이(가) 모은 기세를 터뜨려 ' + wn + '을(를) 내리꽂았다'],
+    retreat: ['이(가) 말머리를 돌려 달아났다']
+  }[act] || ['이(가) 맞섰다'];
+  var line = n + verbs[Math.floor(P * verbs.length)];
+  if (hitTaken > 0) line += hitTaken >= 25 ? ' — 그러나 크게 베였다! (−' + hitTaken + ')' : ' — 그러나 한 대 맞았다 (−' + hitTaken + ')';
+  else if (act === 'guard' && (opAct === 'atk' || opAct === 'power')) line += ' — 막아 냈다!';
+  return SG.josa(line);
+};
 SG.duelNew = function (a, b) {
   return { f: [{ oid: a, hp: 100, sp: 10 }, { oid: b, hp: 100, sp: 10 }], round: 0, over: null };
 };
@@ -232,7 +266,7 @@ SG.duelRound = function (D, acts) {
     D.over = { draw: true };
     note += ' 날이 저물어 두 장수가 물러났다.';
   }
-  return { acts: acts, dmg: dmg, text: note };
+  return { acts: acts, dmg: dmg, text: note, moves: [SG.duelMoveText(F[0].oid, acts[0], dmg[0], acts[1]), SG.duelMoveText(F[1].oid, acts[1], dmg[1], acts[0])] };
 };
 // 컴퓨터의 수: 무력이 높을수록 덤비고, 상대 기세가 차면 막고, 제 기세가 차면 필살
 SG.duelAI = function (D, i) {

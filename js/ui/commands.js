@@ -20,7 +20,8 @@ SG.UI.CMD_GROUPS = [
     { label: '등용', run: function (cid) { return SG.UI.cmdRecruit(cid); } },
     { label: '포상', run: function (cid) { return SG.UI.cmdReward(cid); } },
     { label: '이동', run: function (cid) { return SG.UI.cmdMove(cid); } },
-    { label: '태수 임명', run: function (cid) { return SG.UI.appointGov(cid); } }
+    { label: '태수 임명', run: function (cid) { return SG.UI.appointGov(cid); } },
+    { label: '군사 임명', run: function () { return SG.UI.appointStrategist(); } }
   ] }
 ];
 
@@ -28,7 +29,7 @@ SG.UI.CMD_GROUPS = [
 SG.UI.CMD_META = {
   '농업 개발': ['agri', '금 50 · 정치'], '상업 개발': ['comm', '금 50 · 정치'], '성벽 보수': ['wall', '금 50 · 통솔'], '민심 안정': ['relief', '식량 300 · 매력'], '교역': ['trade', '금 ↔ 식량'],
   '징병': ['conscript', '금 · 매력'], '훈련': ['train', '통솔'], '출진': ['attack', '이웃 도시 공격'],
-  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금·보물'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'], '태수 임명': ['officer', '정치·매력 · 횟수 안 씀'],
+  '인재 탐색': ['search', '지력·매력'], '등용': ['recruit', '매력'], '포상': ['reward', '금·보물'], '이동': ['move', '장수·병사·물자'], '수송': ['transport', '금·식량'], '태수 임명': ['officer', '정치·매력 · 횟수 안 씀'], '군사 임명': ['scroll', '지력 · 횟수 안 씀'],
   '유언비어': ['rumor', '금 50 · 지력'], '이간': ['sow', '금 80 · 지력'],
   '친선': ['gift', '금 300 · 매력'], '동맹': ['ally', '매력'], '항복 권고': ['surrender', '매력']
 };
@@ -47,11 +48,13 @@ SG.UI.commandBox = function (cid) {
     g.items.forEach(function (it) {
       var meta = SG.UI.CMD_META[it.label] || ['order', ''];
       var key = SG.UI.CMD_KEY_OF && SG.UI.CMD_KEY_OF[it.label], used = key && SG.cmdUsed(cid, key);
-      grid.appendChild(h('button', { class: 'cmd' + (it.cls ? ' ' + it.cls : '') + (used ? ' used' : ''), type: 'button', 'data-cmd': it.label, disabled: used || null, title: used ? '이번 달에 이미 했습니다 (명령마다 한 달에 한 번)' : null, onclick: async function () {
+      // 명령 카드: 위에 명령 그림(img/cmd, Higgsfield 공필화), 아래 옻칠 띠에 이름과 쓰는 능력
+      var pic = h('span', { class: 'cmd-pic', style: { backgroundImage: 'url(img/cmd/' + meta[0] + '.jpg)' } }, [h('span', { class: 'cmd-ic' }, [SG.UI.icon(meta[0], 16)])]);
+      grid.appendChild(h('button', { class: 'cmd card' + (it.cls ? ' ' + it.cls : '') + (used ? ' used' : ''), type: 'button', 'data-cmd': it.label, disabled: used || null, title: used ? '이번 달에 이미 했습니다 (명령마다 한 달에 한 번)' : meta[1], onclick: async function () {
         SG.UI.pendingHelpers = null;
         await it.run(cid);
         SG.UI.refresh();
-      } }, [SG.UI.icon(meta[0], 22), h('span', { class: 'cmd-l', text: it.label }), h('span', { class: 'cmd-h', text: used ? '이번 달 완료' : meta[1] }), used ? h('span', { class: 'cmd-done', text: '完' }) : null]));
+      } }, [pic, h('span', { class: 'cmd-l', text: it.label }), h('span', { class: 'cmd-h', text: used ? '이번 달 완료' : meta[1] }), used ? h('span', { class: 'cmd-done', text: '完' }) : null]));
     });
   }
   SG.UI.CMD_GROUPS.forEach(function (g) {

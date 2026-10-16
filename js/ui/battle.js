@@ -61,6 +61,7 @@ SG.UI.tactical = function (atk, def) {
     stage.appendChild(svgEl);
     var defs = S2('defs', {}, svgEl);
     S2('circle', { r: R - 10 }, S2('clipPath', { id: 'clip-me' }, defs));
+    S2('circle', { r: 11.5 }, S2('clipPath', { id: 'clip-face' }, defs));
     // 종이·흙 결 (지형 위에 살짝 덮는다)
     var tex = S2('filter', { id: 'bt-tex', x: 0, y: 0, width: '100%', height: '100%' }, defs);
     S2('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.035', numOctaves: 3, seed: 7, result: 'n' }, tex);
@@ -171,9 +172,17 @@ SG.UI.tactical = function (atk, def) {
         g.addEventListener('click', function () { onHex(u.c, u.r); });
         if (st.lunge && st.lunge.id === u.id) { inner.classList.add('lunge'); inner.style.setProperty('--lx', st.lunge.dx + 'px'); inner.style.setProperty('--ly', st.lunge.dy + 'px'); }
         if (st.hit && st.hit[u.id]) inner.classList.add('hit');
+        // 부대: 병종 그림(步 창방패·騎 기병·弓 궁병, img/unit) + 세력 색 땅 + 깃발 + 장수 얼굴 + 병력 막대
         var rr = R - 6;
         S2('ellipse', { cx: 0, cy: rr - 1, rx: rr * 0.85, ry: 5, class: 'unit-shadow' }, inner);
+        var gd = S2('ellipse', { cx: 0, cy: rr - 4, rx: rr * 0.82, ry: 7, class: 'unit-ground' }, inner);
+        gd.style.fill = fcol[u.side];
         if (st.sel === u) S2('circle', { r: rr + 4, class: 'unit-sel' }, inner);
+        var UA = { inf: 218 / 200, cav: 166 / 200, arc: 205 / 200 }, uw = u.t === 'cav' ? 64 : 56, uh = uw * (UA[u.t] || 1);
+        var face = u.side === 'atk' ? 1 : -1; // 공격군은 오른쪽(성 쪽), 수비군은 왼쪽을 본다
+        var sg = S2('g', { transform: 'scale(' + face + ',1)' }, inner);
+        var spr = S2('image', { x: -uw / 2 + 2, y: rr + 1 - uh, width: uw, height: uh, class: 'unit-sprite' }, sg);
+        spr.setAttribute('href', 'img/unit/' + (u.t || 'inf') + '.png');
         // 깃발 (깃대 + 성씨 한 글자)
         var fx0 = rr - 6, fy0 = -rr - 14;
         S2('path', { d: 'M' + fx0 + ',' + (fy0 - 2) + ' V' + (-4), class: 'pole' }, inner);
@@ -181,28 +190,28 @@ SG.UI.tactical = function (atk, def) {
         var fl = S2('path', { d: 'M0,0 h17 l-3,5 3,5 3,0 -3,5 3,5 h-20 Z', class: 'flag-cloth' }, flag);
         fl.style.fill = fcol[u.side];
         var ft = S2('text', { x: 8, y: 14, 'text-anchor': 'middle', class: 'flag-char' }, flag); ft.textContent = surname(u);
-        var ring = S2('circle', { r: rr, class: 'unit-ring' }, inner);
-        ring.style.fill = fcol[u.side];
-        var t = S2('text', { y: 6, 'text-anchor': 'middle', 'font-size': 17, fill: '#fff', style: 'font-family:var(--f-display)' }, inner);
-        t.textContent = surname(u);
+        // 장수 얼굴 (왼쪽 위 작은 원)
+        var fg = S2('g', { transform: 'translate(' + (-rr + 4) + ',' + (-rr + 2) + ')' }, inner);
+        var fr = S2('circle', { r: 13, class: 'unit-face-ring' }, fg);
+        fr.style.fill = fcol[u.side];
         if (u.oid) {
-          var r0 = rr - 4;
-          var im = S2('image', { x: -r0, y: -r0, width: 2 * r0, height: 2 * r0, 'clip-path': 'url(#clip-me)', preserveAspectRatio: 'xMidYMid slice' }, inner);
+          var im = S2('image', { x: -11.5, y: -11.5, width: 23, height: 23, 'clip-path': 'url(#clip-face)', preserveAspectRatio: 'xMidYMid slice' }, fg);
           im.setAttribute('href', SG.UI.portraitSrc(u.oid, true));
           im.addEventListener('error', function () { im.remove(); });
-        }
-        var frac = Math.max(0, u.n / Math.max(1, u.max)), circ = 2 * Math.PI * (rr + 1);
-        S2('circle', { r: rr + 1, class: 'hp-track' }, inner);
-        S2('circle', { r: rr + 1, class: 'hp-arc ' + (u.side === me ? 'hp-me' : 'hp-foe'), 'stroke-dasharray': (circ * frac).toFixed(1) + ' ' + circ.toFixed(1), transform: 'rotate(-90)' }, inner);
+        } else { var ftx = S2('text', { y: 4.5, 'text-anchor': 'middle', class: 'flag-char' }, fg); ftx.textContent = '兵'; }
+        // 병력 막대 + 숫자
+        var frac = Math.max(0, u.n / Math.max(1, u.max)), bwid = rr * 1.5;
+        S2('rect', { x: -bwid / 2, y: rr - 1, width: bwid, height: 4, rx: 2, class: 'hp-bar-t' }, inner);
+        S2('rect', { x: -bwid / 2, y: rr - 1, width: bwid * frac, height: 4, rx: 2, class: 'hp-bar ' + (u.side === me ? 'hp-me' : 'hp-foe') }, inner);
         var lbl = u.n >= 1000 ? (u.n / 1000).toFixed(1) + 'k' : String(u.n);
         var bw = 8 + lbl.length * 6.5;
-        S2('rect', { x: -bw / 2, y: rr - 2, width: bw, height: 14, rx: 7, class: 'unit-badge' }, inner);
-        var n = S2('text', { y: rr + 8.5, 'text-anchor': 'middle', class: 'unit-num' }, inner);
+        S2('rect', { x: -bw / 2, y: rr + 3, width: bw, height: 13, rx: 6.5, class: 'unit-badge' }, inner);
+        var n = S2('text', { y: rr + 13, 'text-anchor': 'middle', class: 'unit-num' }, inner);
         n.textContent = lbl;
-        if (u.conf > 0) { var cf = S2('text', { x: -rr - 2, y: -rr + 6, class: 'unit-conf' }, inner); cf.textContent = '亂'; }
+        if (u.conf > 0) { var cf = S2('text', { x: rr - 14, y: 2, class: 'unit-conf' }, inner); cf.textContent = '亂'; }
         // 병종 표시 (왼쪽 아래 작은 원: 步·騎·弓)
-        S2('circle', { cx: -rr + 2, cy: rr - 6, r: 8.5, class: 'unit-type t-' + u.t }, inner);
-        var ty = S2('text', { x: -rr + 2, y: rr - 2.2, 'text-anchor': 'middle', class: 'unit-type-ch' }, inner); ty.textContent = SG.TROOPS[u.t].h;
+        S2('circle', { cx: -rr + 1, cy: rr - 9, r: 8, class: 'unit-type t-' + u.t }, inner);
+        var ty = S2('text', { x: -rr + 1, y: rr - 5.4, 'text-anchor': 'middle', class: 'unit-type-ch' }, inner); ty.textContent = SG.TROOPS[u.t].h;
         if (st.flash[u.id]) {
           var fx = S2('text', { y: -rr - 18, 'text-anchor': 'middle', class: 'unit-flash' + (st.flash[u.id].charAt(0) === '-' ? '' : ' info') }, g);
           fx.textContent = st.flash[u.id];
@@ -566,6 +575,28 @@ SG.UI.tactical = function (atk, def) {
 
     // ---- 일기토 연출: 몇 합을 주고받은 뒤 결과
     // ---- 직접 겨루는 일기토: 합마다 수를 고른다. mine = 우리 장수(왼쪽), foe = 적 장수. 끝나면 {winner, loser, fate} 또는 {draw}
+    // 일기토 무대: 두 군대 사이 들판 그림 + 말 탄 두 장수(무기에 따라 언월도·창) + 맞부딪힐 때 불꽃
+    function duelArena(a, d, fa, fd, vs) {
+      // 창·극은 창 든 장수, 칼·검은 언월도 든 장수. 둘이 같으면 오른쪽은 다른 그림으로
+      var ka = SG.weaponOf(a.oid).k === 'spear' ? 'spear' : 'blade', kd = SG.weaponOf(d.oid).k === 'spear' ? 'spear' : 'blade';
+      if (kd === ka) kd = ka === 'spear' ? 'blade' : 'spear';
+      function horse(k, side) { return h('img', { class: 'duel-horse ' + side, alt: '', src: 'img/unit/duel-' + k + '.png' }); }
+      [fa, fd].forEach(function (f) { if (f._chip) f.appendChild(f._chip); }); // 수 표시는 이름 카드 아래로
+      var ha = horse(ka, 'l'), hd = horse(kd, 'r'), spark = h('div', { class: 'duel-spark' }), dust = h('div', { class: 'duel-dust' });
+      var el = h('div', { class: 'duel-arena' }, [dust, ha, hd, spark, fa, vs, fd]);
+      el.charge = function (hitA, hitD, big) {
+        [ha, hd].forEach(function (x) { x.classList.remove('charge'); void x.offsetWidth; x.classList.add('charge'); });
+        setTimeout(function () {
+          spark.className = 'duel-spark'; void spark.offsetWidth; spark.className = 'duel-spark on' + (big ? ' big' : '');
+          if (hitA) { ha.classList.remove('hurt'); void ha.offsetWidth; ha.classList.add('hurt'); }
+          if (hitD) { hd.classList.remove('hurt'); void hd.offsetWidth; hd.classList.add('hurt'); }
+        }, 230);
+      };
+      el.end = function (loserSide) { (loserSide === 'l' ? ha : hd).classList.add('down'); };
+      return el;
+    }
+    // 화면 검사용: 지금 전투의 첫 두 장수로 일기토를 띄운다
+    SG.UI._duelTest = function () { var a = SG.T.alive(B, 'atk').filter(function (u) { return u.oid; })[0], d = SG.T.alive(B, 'def').filter(function (u) { return u.oid; })[0]; return playDuel(a, d); };
     function playDuel(mine, foe) {
       return new Promise(function (done) {
         var D = SG.duelNew(mine.oid, foe.oid), busy = false;
@@ -574,7 +605,7 @@ SG.UI.tactical = function (atk, def) {
           var hp = h('i'), sp = h('i'), chip = h('div', { class: 'duel-chip' }), pop = h('div', { class: 'duel-pop' });
           var el = h('div', { class: 'duel-f ' + key, style: { borderColor: fcol[u.side] } }, [
             h('div', { class: 'duel-imgw' }, [h('img', { alt: u.name, src: SG.UI.portraitSrc(u.oid) }), chip, pop]),
-            h('div', { class: 'duel-n' }, [h('b', { text: u.name }), h('span', { text: fname[u.side] + ' · 무력 ' + u.war + (u.sk ? ' · ' + u.sk : '') })]),
+            h('div', { class: 'duel-n' }, [h('b', { text: u.name }), h('span', { text: fname[u.side] + ' · 무력 ' + u.war + ' · ' + SG.weaponOf(u.oid).n + (u.sk ? ' · ' + u.sk : '') })]),
             h('div', { class: 'duel-hp' }, [hp]), h('div', { class: 'duel-sp' }, [sp, h('small', { text: '기세' })])
           ]);
           el._hp = hp; el._sp = sp; el._chip = chip; el._pop = pop;
@@ -584,9 +615,11 @@ SG.UI.tactical = function (atk, def) {
         var line = h('div', { class: 'duel-line', text: mine.name + '와(과) ' + foe.name + '이(가) 진 앞으로 나섰다! 수를 고르십시오.' });
         var round = h('div', { class: 'duel-round', text: '1합' });
         var acts = h('div', { class: 'duel-acts' });
+        var dlog = h('div', { class: 'duel-log' });
         var legend = h('div', { class: 'duel-legend', text: '攻 공격은 氣 기합을 끊고 · 猛 강공은 攻 공격을 누르고 · 守 방어는 猛 강공을 막아 되친다 · 必 필살(기세 60)은 다 뚫는다' });
-        var box = h('div', { class: 'duel-box live' }, [h('div', { class: 'duel-title', text: '일기토' }),
-          h('div', { class: 'duel-stage' }, [fa, h('div', { class: 'duel-vs' }, [round, h('span', { text: '對' })]), fd]), line, acts, legend]);
+        var arena;
+        var box = h('div', { class: 'duel-box live painted' }, [h('div', { class: 'duel-title', text: '일기토' }),
+          arena = duelArena(mine, foe, fa, fd, h('div', { class: 'duel-vs' }, [round, h('span', { text: '對' })])), line, acts, dlog, legend]);
         ov.appendChild(box);
         root.appendChild(ov);
         SG.UI.sfx('duel');
@@ -617,14 +650,20 @@ SG.UI.tactical = function (atk, def) {
           busy = true; drawActs();
           var ai = SG.duelAI(D, 1), res = SG.duelRound(D, [k, ai]);
           showChip(fa, res.acts[0]); showChip(fd, res.acts[1]);
+          if (res.acts[0] !== 'retreat' && res.acts[1] !== 'retreat') arena.charge(res.dmg[0] > 0, res.dmg[1] > 0, res.acts.indexOf('special') >= 0);
           box.classList.remove('clash'); void box.offsetWidth; if (res.dmg[0] || res.dmg[1]) box.classList.add('clash');
           SG.UI.sfx(res.acts.indexOf('special') >= 0 ? 'broken' : res.dmg[0] || res.dmg[1] ? 'clash' : 'click');
           setTimeout(function () {
             popDmg(fa, res.dmg[0]); popDmg(fd, res.dmg[1]); upd();
-            line.textContent = SG.josa(res.text);
+            // 무엇을 했는지 두 줄 + 결과 한 줄, 아래에 지난 합 기록
+            line.innerHTML = '';
+            (res.moves || []).forEach(function (m, i) { line.appendChild(h('div', { class: 'duel-mv ' + (i ? 'r' : 'l'), text: m })); });
+            line.appendChild(h('div', { class: 'duel-note', text: SG.josa(res.text) }));
+            dlog.insertBefore(h('div', null, [h('b', { text: D.round + '합' }), ' ' + (res.moves || []).join(' / ')]), dlog.firstChild);
+            while (dlog.children.length > 6) dlog.removeChild(dlog.lastChild);
             if (D.over) return finishDuel();
             round.textContent = (D.round + 1) + '합';
-            if (D.f[1].sp >= 60) line.textContent += ' — ' + SG.josa(foe.name + '의 기세가 차올랐다! 필살을 조심하라.');
+            if (D.f[1].sp >= 60) line.appendChild(h('div', { class: 'duel-warn', text: SG.josa(foe.name + '의 기세가 차올랐다! 필살을 조심하라.') }));
             busy = false; drawActs();
           }, 420);
         }
@@ -637,6 +676,7 @@ SG.UI.tactical = function (atk, def) {
           else {
             var meWon = R.winner === mine.oid;
             (meWon ? fd : fa).classList.add('lost'); (meWon ? fa : fd).classList.add('won');
+            arena.end(meWon ? 'r' : 'l');
             line.appendChild(h('b', { text: SG.name(R.winner) + ' 승리!' }));
             line.appendChild(document.createTextNode(' ' + SG.josa(SG.name(R.loser) + '은(는) ' + SG.DUEL_FATE[R.fate] + '.')));
             SG.UI.sfx(meWon ? 'win' : 'lose');
@@ -665,7 +705,7 @@ SG.UI.tactical = function (atk, def) {
           var bar = h('i');
           var el = h('div', { class: 'duel-f ' + key, style: { borderColor: fcol[u.side] } }, [
             h('img', { alt: u.name, src: SG.UI.portraitSrc(u.oid) }),
-            h('div', { class: 'duel-n' }, [h('b', { text: u.name }), h('span', { text: fname[u.side] + ' · 무력 ' + u.war })]),
+            h('div', { class: 'duel-n' }, [h('b', { text: u.name }), h('span', { text: fname[u.side] + ' · 무력 ' + u.war + ' · ' + SG.weaponOf(u.oid).n })]),
             h('div', { class: 'duel-hp' }, [bar])
           ]);
           el._bar = bar;
@@ -675,7 +715,8 @@ SG.UI.tactical = function (atk, def) {
         var line = h('div', { class: 'duel-line', text: '두 장수가 진 앞으로 나선다!' });
         var round = h('div', { class: 'duel-round', text: '' });
         var skip = h('button', { class: 'btn small duel-skip', text: '건너뛰기' });
-        var box = h('div', { class: 'duel-box' }, [h('div', { class: 'duel-title', text: '일기토' }), h('div', { class: 'duel-stage' }, [fa, h('div', { class: 'duel-vs' }, [round, h('span', { text: '對' })]), fd]), line, skip]);
+        var arena = duelArena(a, d, fa, fd, h('div', { class: 'duel-vs' }, [round, h('span', { text: '對' })]));
+        var box = h('div', { class: 'duel-box painted' }, [h('div', { class: 'duel-title', text: '일기토' }), arena, line, skip]);
         ov.appendChild(box);
         root.appendChild(ov);
         var aWins = res.winner === a.oid;
@@ -688,6 +729,7 @@ SG.UI.tactical = function (atk, def) {
           if (aWins) hp.d = res.fate === 'fled' ? 18 : 0; else hp.a = res.fate === 'fled' ? 18 : 0;
           upd();
           (aWins ? fd : fa).classList.add('lost'); (aWins ? fa : fd).classList.add('won');
+          arena.end(aWins ? 'r' : 'l');
           round.textContent = '';
           line.innerHTML = '';
           line.appendChild(h('b', { text: SG.name(res.winner) + ' 승리!' }));
@@ -707,10 +749,11 @@ SG.UI.tactical = function (atk, def) {
           upd();
           var who = hitA ? fd : fa;
           who.classList.remove('struck'); void who.offsetWidth; who.classList.add('struck');
+          arena.charge(!hitA, hitA, false);
           box.classList.remove('clash'); void box.offsetWidth; box.classList.add('clash');
           var tpl = SG.UI.DUEL_LINES[Math.floor(Math.random() * SG.UI.DUEL_LINES.length)];
           var A = hitA ? a : d, D = hitA ? d : a;
-          line.textContent = SG.josa(tpl.replace(/\{a\}/g, A.name).replace(/\{d\}/g, D.name));
+          line.textContent = SG.duelMoveText(A.oid, Math.random() < 0.6 ? 'atk' : 'power', 0, 'guard').replace(/[.!]?$/, '') + ' — ' + SG.josa(tpl.replace(/\{a\}/g, A.name).replace(/\{d\}/g, D.name));
           SG.UI.sfx('clash');
         }, 650);
       });

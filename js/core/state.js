@@ -171,6 +171,11 @@ SG.saveSlot = function (slot) {
     cities: SG.S.player ? SG.citiesOf(SG.S.player).length : 0, diff: SG.S.diff || 'easy'
   }));
 };
+// 달이 바뀌기 전의 자동 저장을 「지난달」로 한 벌 남긴다 (자동 저장이 잘못돼도 되돌아갈 수 있게)
+SG.rotateAuto = function () {
+  var d = localStorage.getItem(SG.SAVE_KEY + 'auto'), m = localStorage.getItem(SG.SAVE_KEY + 'auto_meta');
+  if (d && m) { localStorage.setItem(SG.SAVE_KEY + 'prev', d); localStorage.setItem(SG.SAVE_KEY + 'prev_meta', m); }
+};
 SG.loadSlot = function (slot) {
   var data = localStorage.getItem(SG.SAVE_KEY + slot);
   if (!data) throw new Error('저장된 기록이 없습니다');

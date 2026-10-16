@@ -306,9 +306,11 @@ SG.UI.saveLoad = async function (mode) {
   var closeFn;
   function render() {
     body.innerHTML = '';
+    body.appendChild(h('p', { class: 'note', style: { marginTop: 0 }, text: '게임은 명령을 내릴 때마다, 턴이 끝날 때마다, 창을 닫을 때 자동으로 저장됩니다 (타이틀의 「이어하기」). 기록 1~5는 따로 남겨 두는 저장입니다.' }));
     if (mode === 'load') {
-      var am = SG.slotMeta('auto');
-      body.appendChild(slotRow('auto', '자동 저장', am));
+      body.appendChild(slotRow('auto', '자동 저장 (마지막으로 한 것)', SG.slotMeta('auto')));
+      var pm = SG.slotMeta('prev');
+      if (pm) body.appendChild(slotRow('prev', '자동 저장 (지난달 끝)', pm));
     }
     slots.forEach(function (s) { body.appendChild(slotRow(s, '기록 ' + s, SG.slotMeta(s))); });
     body.appendChild(h('div', { style: { display: 'flex', gap: '8px', marginTop: '14px' } }, [

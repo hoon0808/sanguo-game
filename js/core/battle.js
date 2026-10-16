@@ -140,6 +140,12 @@ SG.launchAttack = async function (from, to, units, supply) {
   await SG.finishBattle(atk, def, res);
   return { ok: true, winner: res.winner, msg: res.winner === 'atk' ? SG.cityName(to) + ' 점령 성공!' : SG.cityName(to) + ' 공략 실패.' };
 };
+// 싸우는 동안(병사가 도시를 떠나 있는 동안)은 자동 저장을 하지 않도록 표시해 둔다
+SG._launchAttackRaw = SG.launchAttack;
+SG.launchAttack = async function () {
+  SG.battling = (SG.battling || 0) + 1;
+  try { return await SG._launchAttackRaw.apply(this, arguments); } finally { SG.battling--; }
+};
 
 // ---- 일기토 (장수 1:1 대결)
 SG.duelWinChance = function (a, b) {

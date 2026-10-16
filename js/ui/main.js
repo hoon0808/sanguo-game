@@ -40,7 +40,27 @@ SG.UI.refresh = function () {
   SG.UI.renderPanel(document.getElementById('panel'), SG.UI.state.sel);
   SG.UI.setDrawer(SG.UI.state.drawer);
   SG.UI.renderAdvisor();
+  SG.UI.autoSave();
 };
+
+// ---- 자동 저장: 명령·임명 등으로 화면이 새로 그려질 때마다 잠시 뒤 저장한다 (턴 진행·전투 중에는 하지 않음).
+// 예전에는 턴 종료 때만 저장해서, 달 중간에 창을 닫으면 그달에 한 명령이 사라졌다.
+SG.UI.autoSave = function (now) {
+  clearTimeout(SG.UI._asT);
+  function run() {
+    if (!SG.S || !SG.S.player || SG.S.over || SG.UI.state.busy || SG.battling || !document.getElementById('topbar')) return;
+    try { SG.saveSlot('auto'); SG.UI._asFail = false; } catch (e) { SG.UI.saveFailed(e); }
+  }
+  if (now) run(); else SG.UI._asT = setTimeout(run, 500);
+};
+SG.UI.saveFailed = function (e) {
+  if (SG.UI._asFail) return;
+  SG.UI._asFail = true;
+  SG.UI.toast('자동 저장을 하지 못했습니다' + (e && e.name === 'QuotaExceededError' ? ' (저장 공간이 가득 참)' : ' (이 브라우저는 저장 공간을 쓸 수 없음)') + ' — 메뉴 → 저장 → 「파일로 내보내기」로 보관하세요', true);
+};
+// 창을 닫거나 다른 앱으로 넘어갈 때도 바로 저장
+window.addEventListener('pagehide', function () { SG.UI.autoSave(true); });
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') SG.UI.autoSave(true); });
 
 // ---- 군사의 조언: 매달 상황을 살펴 한마디씩
 SG.UI.advice = function () {
@@ -209,7 +229,7 @@ SG.UI.endTurn = async function () {
     SG.UI.sfx(S.month === SG.HARVEST_MONTH ? 'harvest' : 'turn');
     SG.UI.busy(null);
     if (!S.over) {
-      try { SG.saveSlot('auto'); } catch (e) { /* 저장소를 쓸 수 없으면 무시 */ }
+      try { SG.rotateAuto(); SG.saveSlot('auto'); } catch (e) { SG.UI.saveFailed(e); }
       SG.log(S.player, S.year + '년 ' + S.month + '월', 'turn');
     }
   } catch (e) {

@@ -1607,3 +1607,7 @@ html.compact .prebattle .pb-img { height: 90px; }
 .city-g.mine .own { opacity: .62; }
 :root[data-theme="dark"] .city-g image.castle { filter: brightness(.86) drop-shadow(0 1px 1.2px rgba(0, 0, 0, .7)); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .city-g image.castle { filter: brightness(.86) drop-shadow(0 1px 1.2px rgba(0, 0, 0, .7)); } }
+
+/* 전투 화면 성: 그린 그림 */
+.bt-sprite { filter: drop-shadow(0 2px 1.5px rgba(20, 14, 6, .5)); }
+.keep-tag { fill: rgba(60, 30, 20, .85); stroke: #e8cf8a; stroke-width: 1; }

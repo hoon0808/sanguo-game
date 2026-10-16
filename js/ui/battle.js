@@ -97,6 +97,14 @@ SG.UI.tactical = function (atk, def) {
     }
 
     // ---- 지형 그리기 (한 번만)
+    // 그린 그림 한 장을 칸 위에 세운다 (cx: 가운데, by: 그림 아래쪽 y, w: 너비)
+    var SPRITE_AR = { bwall: 185 / 200, btower: 213 / 200, bgate: 187 / 200, bkeep: 167 / 200, bhouse1: 152 / 200, bhouse2: 153 / 200 };
+    function sprite(parent, name, cx, by, w) {
+      var hh = w * SPRITE_AR[name];
+      var im = S2('image', { x: cx - w / 2, y: by - hh, width: w, height: hh, class: 'bt-sprite', 'pointer-events': 'none' }, parent);
+      im.setAttribute('href', 'img/castle/' + name + '.png');
+      return im;
+    }
     function drawTerrain() {
       var K = SG.T.CASTLE;
       for (var r = 0; r < SG.T.ROWS; r++) for (var c = 0; c < SG.T.COLS; c++) {
@@ -134,25 +142,15 @@ SG.UI.tactical = function (atk, def) {
           if (tt === 'water') for (var wv = 0; wv < (TEX.water ? 1 : 2); wv++) {
             S2('path', { d: 'M' + (p.x - 14) + ',' + (p.y - 4 + wv * 9) + ' q4,-4 8,0 t8,0 t8,0', class: 'wave', style: 'animation-delay:' + (rnd(wv) * -2).toFixed(2) + 's' }, d);
           }
-          if (tt === 'wall') {
-            S2('rect', { x: p.x - 16, y: p.y - 6, width: 32, height: 16, class: 'stone' }, d);
-            for (var b = 0; b < 4; b++) S2('rect', { x: p.x - 16 + b * 8 + 1, y: p.y - 11, width: 5, height: 6, class: 'stone' }, d);
-            S2('path', { d: 'M' + (p.x - 16) + ',' + (p.y + 2) + ' h32 M' + (p.x - 6) + ',' + (p.y - 6) + ' v8 M' + (p.x + 6) + ',' + (p.y + 2) + ' v8', class: 'mortar' }, d);
-          }
-          if (tt === 'gate') {
-            S2('rect', { x: p.x - 15, y: p.y - 9, width: 30, height: 19, class: 'stone' }, d);
-            S2('path', { d: 'M' + (p.x - 8) + ',' + (p.y + 10) + ' v-9 a8,8 0 0 1 16,0 v9 Z', class: 'door' }, d);
-            S2('path', { d: 'M' + p.x + ',' + (p.y - 6) + ' v16', class: 'mortar' }, d);
-            S2('path', { d: 'M' + (p.x - 18) + ',' + (p.y - 9) + ' L' + p.x + ',' + (p.y - 17) + ' L' + (p.x + 18) + ',' + (p.y - 9) + ' Z', class: 'roof' }, d);
-          }
+          // 성: 지도 성과 같은 그린 그림 (img/castle/b*.png) — 성벽·망루·성문·본성·성안 집
+          if (tt === 'wall') sprite(d, rnd(7) < 0.3 ? 'btower' : 'bwall', p.x, p.y + 19, rnd(7) < 0.3 ? 50 : 54);
+          if (tt === 'gate') sprite(d, 'bgate', p.x, p.y + 21, 58);
           if (tt === 'keep') {
-            S2('rect', { x: p.x - 12, y: p.y - 2, width: 24, height: 13, class: 'stone' }, d);
-            S2('path', { d: 'M' + (p.x - 19) + ',' + (p.y - 1) + ' Q' + p.x + ',' + (p.y - 9) + ' ' + (p.x + 19) + ',' + (p.y - 1) + ' L' + (p.x + 13) + ',' + (p.y - 7) + ' L' + (p.x - 13) + ',' + (p.y - 7) + ' Z', class: 'roof' }, d);
-            S2('rect', { x: p.x - 7, y: p.y - 14, width: 14, height: 8, class: 'stone' }, d);
-            S2('path', { d: 'M' + (p.x - 13) + ',' + (p.y - 12) + ' Q' + p.x + ',' + (p.y - 20) + ' ' + (p.x + 13) + ',' + (p.y - 12) + ' L' + (p.x + 8) + ',' + (p.y - 17) + ' L' + (p.x - 8) + ',' + (p.y - 17) + ' Z', class: 'roof' }, d);
-            var kt = S2('text', { x: p.x, y: p.y + 9, 'text-anchor': 'middle', class: 'keep-char' }, d); kt.textContent = '本';
+            sprite(d, 'bkeep', p.x, p.y + 20, 62);
+            S2('rect', { x: p.x - 9, y: p.y + 13, width: 18, height: 14, rx: 3, class: 'keep-tag' }, d);
+            var kt = S2('text', { x: p.x, y: p.y + 24, 'text-anchor': 'middle', class: 'keep-char' }, d); kt.textContent = '本';
           }
-          if (tt === 'castle' && c >= K.c - 1) S2('rect', { x: p.x - 9, y: p.y - 3, width: 18, height: 10, rx: 1, class: 'house' }, d);
+          if (tt === 'castle' && rnd(8) < 0.8) sprite(d, rnd(9) < 0.5 ? 'bhouse1' : 'bhouse2', p.x + (rnd(10) - 0.5) * 6, p.y + 16, 44);
         })(c, r);
       }
     }

@@ -366,3 +366,9 @@ html.compact .sup-row { grid-template-columns: 1fr; gap: 2px; }
 html.compact .sup-row .note { font-size: 11px; }
 html.compact .sup-days { justify-self: end; font-size: 12px; }
 html.portrait .bt-cmd-h { display: flex; align-items: center; gap: 8px; } html.portrait .bt-cmd-h .bt-sup-side { margin: 0 0 0 auto; }
+/* 알현 온몸 그림: 세로 화면은 좁으므로 작게, 손님은 왼쪽으로 */
+html.portrait .hall .visitor.body { left: 36%; height: 250px; }
+html.portrait .hall .visitor.body.b-warrior, html.portrait .hall .visitor.body.b-captive, html.portrait .hall .visitor.body.b-youth { height: 215px; }
+html.portrait .hall .visitor.body.b-scholar, html.portrait .hall .visitor.body.b-lady { height: 280px; }
+html.portrait .hall .visitor.body .v-side { left: -96px; }
+html.portrait .hall .host.body { height: 200px; right: 2%; }

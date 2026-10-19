@@ -1694,3 +1694,25 @@ html.compact .cmdbox .cmd.card .cmd-pic { aspect-ratio: 3 / 2; }
 html.compact .cmdbox .cmd.card .cmd-ic { display: none; }
 html.compact .cmdbox .cmd.card .cmd-l { font-size: 12px; padding-top: 3px; }
 html.compact .cmdbox .cmd.card .cmd-h { font-size: 8.5px; padding-bottom: 3px; }
+
+/* 알현: 온몸 그림 */
+.hall .visitor.body { top: auto; bottom: 96px; left: 44%; transform: translateX(-50%); display: block; height: 340px; width: auto; }
+.hall .visitor.body .v-body { height: 100%; width: auto; display: block; filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .55)) drop-shadow(0 0 1px rgba(255, 240, 210, .6)); }
+.hall .visitor.body.b-warrior, .hall .visitor.body.b-captive, .hall .visitor.body.b-youth { height: 290px; }
+.hall .visitor.body.b-scholar, .hall .visitor.body.b-lady { height: 360px; }
+.hall .visitor.body .v-side { position: absolute; left: -128px; top: 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hall .visitor.body .v-medal { position: relative; }
+.hall .visitor.body .v-medal > .pt { border-radius: 50%; box-shadow: 0 0 0 3px #2a170c, 0 0 0 5px var(--gold), 0 8px 18px rgba(0, 0, 0, .6); overflow: hidden; }
+.hall .visitor.body .v-medal > .pt img { border-radius: 50%; }
+.hall .visitor.body .v-name { font-size: 18px; padding: 3px 12px; white-space: nowrap; flex-direction: column; align-items: center; gap: 0; }
+.hall .visitor.body .v-flag { left: auto; right: -40px; top: 10px; }
+.hall .visitor.body .cap-seal { right: -18px; top: -8px; width: 32px; height: 32px; font-size: 19px; }
+.hall .host.body { top: auto; bottom: 104px; right: 6%; display: block; height: 270px; }
+.hall .host.body .h-body { height: 100%; width: auto; display: block; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, .55)) drop-shadow(0 0 30px rgba(255, 210, 120, .25)); }
+.hall .host.body .h-medal { position: absolute; left: -22px; top: 6px; }
+.hall .host.body .h-medal > .pt { border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px #2a170c, 0 0 0 4px var(--gold), 0 6px 12px rgba(0, 0, 0, .5); }
+.hall .host.body .h-name { position: absolute; left: -26px; top: 70px; width: 66px; text-align: center; font-family: var(--f-display); font-size: 15px; color: #f6ecd2; text-shadow: 0 2px 4px rgba(0, 0, 0, .9); }
+.k-advisor .visitor.body { left: 30%; }
+.k-captive .visitor.body .v-body { filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .55)) saturate(.8); }
+.hall .visitor.body { animation-name: visitInB; }
+@keyframes visitInB { from { opacity: 0; transform: translateX(-50%) translateY(40px) scale(.94); } }

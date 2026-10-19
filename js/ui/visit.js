@@ -24,6 +24,24 @@ SG.UI.figure = function (kind, size) {
     html: '<svg viewBox="0 0 120 150" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">' + f.svg + '</svg>' });
 };
 
+// ---- 알현 장면의 온몸 그림 (img/figures/b-*.png, Higgsfield 공필화, 흰 바탕 따냄). 장수는 몸은 신분에 맞는 그림, 얼굴은 초상 메달로
+SG.UI.FEMALE = { diaochan: 1, sunshangxiang: 1, huangyueying: 1, daqiao: 1, xiaoqiao: 1, zhurong: 1 };
+SG.UI.BODY_AR = {};
+SG.UI.bodyOf = function (opt) {
+  if (opt.figure === 'merchant') return 'b-merchant';
+  if (opt.figure === 'merchant2') return 'b-grain';
+  if (opt.figure === 'soldier' || !opt.visitor) return 'b-general';
+  var id = opt.visitor, o = SG.O(id);
+  if (opt.bound || opt.kind === 'captive') return 'b-captive';
+  if (SG.UI.FEMALE[id]) return 'b-lady';
+  if (opt.kind === 'grown') return 'b-youth';
+  if (opt.kind === 'envoy' || opt.kind === 'gift') return o.war > o.int + 15 ? 'b-general' : 'b-envoy';
+  if (opt.kind === 'advisor') return o.war > o.int + 10 ? 'b-general' : 'b-scholar';
+  if (opt.kind === 'farewell') return o.war >= o.int ? 'b-general' : 'b-scholar';
+  return o.war >= o.int ? 'b-warrior' : 'b-scholar';
+};
+SG.UI.bodyImg = function (name, cls) { return h('img', { class: cls, alt: '', src: 'img/figures/' + name + '.png', draggable: 'false' }); };
+
 SG.UI.VISIT_SFX = { advisor: 'ok', talent: 'found', merchant: 'coin', farewell: 'fail', envoy: 'event', gift: 'coin', grown: 'recruit', succession: 'event', captive: 'capture' };
 
 // opt: SG.visit 과 같음 + bound(포로: 밧줄)
@@ -34,7 +52,9 @@ SG.UI.audience = function (opt) {
   var F = fid && S.forces[fid] ? S.forces[fid] : null;
   var name = opt.visitor ? SG.O(opt.visitor).n : (opt.name || '손님');
   var sub = opt.visitor ? (F ? SG.forceName(fid) + ' 세력' + (opt.kind === 'envoy' || opt.kind === 'gift' ? '의 사신' : '') : (so && so.s === 'free' ? '재야' : '')) : (opt.sub || '');
-  var face = opt.visitor ? SG.UI.portrait(opt.visitor, 236, fid) : SG.UI.figure(opt.figure, 236);
+  var body = SG.UI.bodyOf(opt);
+  // 얼굴 메달: 장수면 초상, 아니면 그린 얼굴(상인 등)
+  var face = opt.visitor ? SG.UI.portrait(opt.visitor, 88, fid) : SG.UI.figure(opt.figure, 88);
   var host = P && S.forces[P] ? S.forces[P] : null;
   var full = SG.josa(opt.text || '');
   var txt = h('div', { class: 'dlg-t' });
@@ -47,11 +67,18 @@ SG.UI.audience = function (opt) {
     h('div', { class: 'hall-bg', style: { backgroundImage: 'url(img/scene/audience.jpg)' } }),
     curtain,
     opt.extra || null,
-    !opt.noHost && host && lord && lord !== opt.visitor ? h('div', { class: 'host' }, [h('div', { class: 'throne' }), SG.UI.portrait(lord, 104, P), h('span', { text: SG.name(lord) })]) : null,
-    h('div', { class: 'visitor' }, [
+    // 군주: 옥좌에 앉은 그림 + 얼굴 메달
+    !opt.noHost && host && lord && lord !== opt.visitor ? h('div', { class: 'host body' }, [
+      SG.UI.bodyImg('b-lord', 'h-body'),
+      h('div', { class: 'h-medal' }, [SG.UI.portrait(lord, 56, P)]), h('span', { class: 'h-name', text: SG.name(lord) })]) : null,
+    // 손님: 신분에 맞는 온몸 그림 + 세력 깃발 + 얼굴 메달 + 이름 판
+    h('div', { class: 'visitor body b-' + body.slice(2) }, [
+      SG.UI.bodyImg(body, 'v-body'),
       F ? h('div', { class: 'v-flag', style: { background: F.color }, text: (SG.O(F.lord).h || SG.forceName(fid)).charAt(0) }) : null,
-      h('div', { class: 'v-frame' }, [face, opt.bound ? h('span', { class: 'cap-rope' }) : null, opt.bound ? h('span', { class: 'cap-seal', text: '虜' }) : null]),
-      h('div', { class: 'v-name' }, [name, sub ? h('small', { text: sub }) : null])
+      h('div', { class: 'v-side' }, [
+        h('div', { class: 'v-medal' }, [face, opt.bound ? h('span', { class: 'cap-seal', text: '虜' }) : null]),
+        h('div', { class: 'v-name' }, [name, sub ? h('small', { text: sub }) : null])
+      ])
     ]),
     dlg
   ]);

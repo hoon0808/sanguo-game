@@ -89,7 +89,7 @@ SG.UI.coopRow = function (cid, stat, getMain, onChange, costNote) {
     if (!ready.length) { wrap.hidden = true; return; }
     wrap.hidden = false;
     wrap.appendChild(h('div', { class: 'coop-h' }, [h('b', { text: '협력 장수' }), h('span', { class: 'coop-n', text: sel.length + ' / ' + SG.COOP_MAX }),
-      h('small', { text: '고르면 능력의 일부(50·35·25%)를 ' + (main ? SG.name(main) + '에게' : '맡은 장수에게') + ' 보탭니다 · 협력한 장수도 이번 달 명령을 씁니다' + (costNote ? ' · ' + costNote : '') })]));
+      h('small', { text: '고르면 능력의 일부(25·15·10%, 최대 120)를 ' + (main ? SG.name(main) + '에게' : '맡은 장수에게') + ' 보탭니다 · 협력한 장수도 이번 달 명령을 씁니다' + (costNote ? ' · ' + costNote : '') })]));
     wrap.appendChild(h('div', { class: 'coop-chips' }, ready.map(function (o) {
       var on = sel.indexOf(o) >= 0;
       return h('button', { type: 'button', class: 'coop-chip' + (on ? ' on' : ''), disabled: !on && sel.length >= SG.COOP_MAX || null, onclick: function () {

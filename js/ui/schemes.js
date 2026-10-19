@@ -38,7 +38,7 @@ SG.UI.cmdRumor = async function (cid) {
       mark: function (o) { return SG.UI.pendingHelpers && SG.UI.pendingHelpers.indexOf(o) >= 0 ? { tag: ['助', '협력'], up: true } : null; },
       onPick: function (o) { closeFn(o); } }));
   };
-  var coopR = SG.UI.coopRow(cid, 'int', null, function () { tbl.refresh(); }, '비용 +50%/명');
+  var coopR = SG.UI.coopRow(cid, 'int', null, function () { tbl.refresh(); }, '비용 +25%/명');
   tbl.refresh();
   var body = h('div', null, [
     SG.UI.brief('헛소문을 퍼뜨려 상대 도시의 민심과 병사 사기를 떨어뜨립니다 · 금 ' + SG.COST.rumor + ' · 지력이 높을수록 잘 됩니다'),
@@ -58,7 +58,7 @@ SG.UI.cmdSow = async function (cid) {
   var plotter = ready.slice().sort(function (a, b) { return SG.O(b).int - SG.O(a).int; })[0];
   var closeFn, body = h('div');
   function sowP(o) { return SG.UI.coopCalc(plotter, function () { return SG.sowChance(plotter, o); }); }
-  var coopS = SG.UI.coopRow(cid, 'int', function () { return plotter; }, function () { render(); }, '비용 +50%/명');
+  var coopS = SG.UI.coopRow(cid, 'int', function () { return plotter; }, function () { render(); }, '비용 +25%/명');
   function render() {
     body.innerHTML = '';
     var sel = h('select', { class: 'inp', style: { width: '200px' }, onchange: function (e) { plotter = e.target.value; render(); } },
@@ -159,7 +159,7 @@ SG.UI.cmdCityScheme = async function (cid, kind) {
       mark: function (o) { return SG.UI.pendingHelpers && SG.UI.pendingHelpers.indexOf(o) >= 0 ? { tag: ['助', '협력'], up: true } : null; },
       onPick: function (o) { closeFn(o); } }));
   };
-  var coopR = SG.UI.coopRow(cid, K.stat, null, function () { tbl.refresh(); }, '비용 +50%/명');
+  var coopR = SG.UI.coopRow(cid, K.stat, null, function () { tbl.refresh(); }, '비용 +25%/명');
   tbl.refresh();
   var body = h('div', null, [
     SG.UI.brief(K.brief),
@@ -182,7 +182,7 @@ SG.UI.cmdPlot = async function (cid) {
   var plotter = ready.slice().sort(function (a, b) { return (SG.O(b).int + SG.O(b).cha) - (SG.O(a).int + SG.O(a).cha); })[0];
   var closeFn, body = h('div');
   function pp(o) { return SG.UI.coopCalc(plotter, function () { return SG.plotChance(plotter, o); }); }
-  var coopP = SG.UI.coopRow(cid, 'int', function () { return plotter; }, function () { render(); }, '비용 +50%/명');
+  var coopP = SG.UI.coopRow(cid, 'int', function () { return plotter; }, function () { render(); }, '비용 +25%/명');
   function render() {
     body.innerHTML = '';
     var sel = h('select', { class: 'inp', style: { width: '220px' }, onchange: function (e) { plotter = e.target.value; render(); } },
@@ -218,7 +218,7 @@ SG.UI.cmdAmbush = async function (cid) {
       mark: function (o) { return SG.UI.pendingHelpers && SG.UI.pendingHelpers.indexOf(o) >= 0 ? { tag: ['助', '협력'], up: true } : null; },
       onPick: function (o) { closeFn(o); } }));
   };
-  var coopA = SG.UI.coopRow(cid, 'int', null, function () { tbl.refresh(); }, '비용 +50%/명');
+  var coopA = SG.UI.coopRow(cid, 'int', null, function () { tbl.refresh(); }, '비용 +25%/명');
   tbl.refresh();
   var th = SG.threat(cid);
   var body = h('div', null, [

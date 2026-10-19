@@ -1,8 +1,12 @@
 // 명령은 도시마다 한 달에 한 번씩 (이동·포상은 빼고). 대신 한 번 명령할 때 장수 여럿이 힘을 모은다 (협력).
-// 협력 장수는 능력치의 일부를 주장에게 보탠다 (그 능력이 높은 순서로 50% · 35% · 25%). 협력한 장수도 이번 달 명령을 쓴다.
+// 협력 장수는 능력치의 일부를 주장에게 보탠다 (그 능력이 높은 순서로 25% · 15% · 10%). 협력한 장수도 이번 달 명령을 쓴다.
+// 보탠 능력은 100을 넘는 부분이 절반만 치고 120에서 멈춘다 (여럿이 모여도 뛰어난 한 사람 정도까지).
 var SG = SG || {};
 
-SG.COOP_W = [0.5, 0.35, 0.25];
+SG.COOP_W = [0.25, 0.15, 0.1];
+SG.COOP_COST = 0.25;   // 협력 1명마다 비용 +25%
+SG.COOP_SOFT = 100;    // 이 위로는 보탬이 절반
+SG.COOP_CAP = 120;
 SG.COOP_MAX = 3;
 // 명령 → 한 달 한 번을 세는 이름
 SG.CMD_KEY = {
@@ -27,7 +31,7 @@ SG.coopBonus = function (helpers) {
   var add = {};
   SG.STAT_KEYS.forEach(function (k) {
     var vals = helpers.map(function (x) { return SG.O(x)[k]; }).sort(function (a, b) { return b - a; });
-    add[k] = Math.round(vals.reduce(function (s, v, i) { return s + v * (SG.COOP_W[i] || 0.2); }, 0));
+    add[k] = Math.round(vals.reduce(function (s, v, i) { return s + v * (SG.COOP_W[i] || 0.1); }, 0));
   });
   return add;
 };
@@ -61,16 +65,24 @@ Object.keys(SG.CMD_KEY).forEach(function (name) {
   };
 });
 
-// 협력 장수 수만큼 늘어나는 비용 (한 사람마다 +50%)
-SG.coopCost = function (base) { return Math.round(base * (1 + 0.5 * (SG._coop ? SG._coop.n : 0))); };
+// 협력 장수 수만큼 늘어나는 비용 (한 사람마다 +25%)
+SG.coopCost = function (base) { return Math.round(base * (1 + SG.COOP_COST * (SG._coop ? SG._coop.n : 0))); };
 
-// 협력 중인 주장은 능력치가 보태진 모습으로 계산된다 (명령 계산 동안만, 상한 없음)
+// 원래 능력 v 에 보탬 add 를 더한 값 (100 위로는 절반, 120 상한, 원래보다 낮아지지는 않음)
+SG.coopStat = function (v, add) {
+  if (!add) return v;
+  var t = v + add, soft = SG.COOP_SOFT;
+  if (t > soft) t = Math.max(v, soft) + (t - Math.max(v, soft)) * 0.5;
+  return Math.max(v, Math.min(SG.COOP_CAP, Math.round(t)));
+};
+
+// 협력 중인 주장은 능력치가 보태진 모습으로 계산된다 (명령 계산 동안만)
 SG._oPlain = SG.O;
 SG.O = function (id) {
   var o = SG._oPlain(id);
   if (!o || !SG._coop || SG._coop.oid !== id) return o;
   var x = {}, add = SG._coop.add;
   for (var p in o) x[p] = o[p];
-  SG.STAT_KEYS.forEach(function (k) { x[k] = o[k] + (add[k] || 0); });
+  SG.STAT_KEYS.forEach(function (k) { x[k] = SG.coopStat(o[k], add[k] || 0); });
   return x;
 };

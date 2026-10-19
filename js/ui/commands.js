@@ -161,14 +161,14 @@ SG.UI.cmdDevelop = async function (cid, kind) {
   var stat = kind === 'wall' ? 'lead' : 'pol';
   var oid = await SG.UI.pickOfficer(cid, { agri: '농업 개발', comm: '상업 개발', wall: '성벽 보수' }[kind] + ' — 누구에게 맡길까요?', stat,
     [{ label: '예상', cls: 'n', get: function (o) { return '+' + Math.round(SG.devGain(o, kind)); } }],
-    '금 ' + SG.COST.develop + ' 사용 (협력 1명마다 +50%) · 보유 금 ' + SG.fmt(c.gold) + (kind === 'wall' ? ' · 통솔·정치가 높을수록 효과가 큽니다' : ' · 정치가 높을수록 효과가 큽니다'),
+    '금 ' + SG.COST.develop + ' 사용 (협력 1명마다 +25%) · 보유 금 ' + SG.fmt(c.gold) + (kind === 'wall' ? ' · 통솔·정치가 높을수록 효과가 큽니다' : ' · 정치가 높을수록 효과가 큽니다'),
     { label: SG.DEV_KIND[kind], cur: c[kind], max: max, gain: function (o) { return SG.devGain(o, kind); } });
   if (oid) await SG.UI.doCmd({ kind: kind, cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.develop(cid, oid, kind); } });
 };
 SG.UI.cmdRelief = async function (cid) {
   var oid = await SG.UI.pickOfficer(cid, '민심 안정 — 누구에게 맡길까요?', 'cha',
     [{ label: '예상', cls: 'n', get: function (o) { return '+' + Math.round((SG.O(o).cha * 0.15 + 6) * (SG.O(o).sk === '인덕' ? 1.3 : 1)); } }],
-    '식량 ' + SG.COST.relief + '을(를) 백성에게 나눕니다 (협력 1명마다 +50%) · 보유 식량 ' + SG.fmt(SG.S.cities[cid].food) + ' · 매력이 높을수록 효과가 큽니다',
+    '식량 ' + SG.COST.relief + '을(를) 백성에게 나눕니다 (협력 1명마다 +25%) · 보유 식량 ' + SG.fmt(SG.S.cities[cid].food) + ' · 매력이 높을수록 효과가 큽니다',
     { label: '민심', cur: SG.S.cities[cid].loyal, max: 100, gain: function (o) { return (SG.O(o).cha * 0.15 + 6) * (SG.O(o).sk === '인덕' ? 1.3 : 1); } });
   if (oid) await SG.UI.doCmd({ kind: 'relief', cid: cid, oid: oid, cities: [cid], run: function () { return SG.cmd.relief(cid, oid); } });
 };

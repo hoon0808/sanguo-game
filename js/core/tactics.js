@@ -91,12 +91,27 @@ SG.T.create = function (atk, def) {
   var T = SG.T, t = SG.S.cities[def.city];
   var B = { atk: atk, def: def, city: def.city, map: T.makeMap(def.city), units: [], day: 1, side: 'atk', log: (atk.pre && atk.pre.log || []).slice(), over: null,
     morale: { atk: atk.morale, def: def.morale }, train: { atk: atk.train, def: def.train }, captured: [], killed: [], seq: 0 };
-  // 수비 장수가 많으면 8명만 성에 나가고 나머지 병사는 나눠 맡는다
-  var dUnits = def.units.slice().sort(function (a, b) { return (b.oid ? SG.O(b.oid).lead : 0) - (a.oid ? SG.O(a.oid).lead : 0); });
-  var field = dUnits.slice(0, 8), reserve = dUnits.slice(8);
-  var extra = reserve.reduce(function (s, u) { return s + u.n; }, 0);
-  reserve.forEach(function (u) { u.n = 0; u.reserve = true; });
-  field.forEach(function (u, i) { u.n += Math.floor(extra / field.length) + (i === 0 ? extra % field.length : 0); u.max = u.n; });
+  // 성에는 10부대까지 나간다 (장수 없는 수비병 포함, 장수는 8명까지). 못 나간 장수의 병사는
+  // 나간 장수가 거느릴 수 있는 만큼 맡고, 남으면 수비병에 합친다
+  var gUnits = def.units.filter(function (u) { return !u.oid && u.n > 0; });
+  var dUnits = def.units.filter(function (u) { return u.oid; }).sort(function (a, b) { return (b.n > 0) - (a.n > 0) || SG.O(b.oid).lead - SG.O(a.oid).lead; });
+  if (gUnits.length > 2) {   // 수비병은 병종 둘까지: 작은 쪽을 큰 쪽에 합친다
+    gUnits.sort(function (a, b) { return b.n - a.n; });
+    gUnits.slice(2).forEach(function (g) { gUnits[1].n += g.n; gUnits[1].max = gUnits[1].n; g.n = 0; g.max = 0; g.reserve = true; });
+    gUnits = gUnits.slice(0, 2);
+  }
+  var nOff = Math.min(8, 10 - gUnits.length), field = dUnits.slice(0, nOff), reserve = dUnits.slice(nOff);
+  reserve.forEach(function (u) {
+    var left = u.n;
+    field.forEach(function (f) { if (left > 0 && f.t === u.t) { var add = Math.min(left, SG.unitCap(f.oid) - f.n); if (add > 0) { f.n += add; f.max = f.n; left -= add; } } });
+    if (left > 0) {
+      var g = gUnits.filter(function (x) { return x.t === u.t; })[0] || (gUnits.length < 10 - field.length ? null : gUnits[0]);
+      if (!g) { g = { oid: null, n: 0, max: 0, t: u.t }; def.units.push(g); gUnits.push(g); }
+      g.n += left; g.max = g.n;
+    }
+    u.n = 0; u.max = 0; u.reserve = true;
+  });
+  field = field.concat(gUnits);
   // 내응으로 넘어온 부대가 있으면 5부대보다 많을 수 있다
   var aSpots = [5, 3, 7, 1, 9].map(function (r) { return [r % 2 === 0 ? 1 : 0, r]; }).concat([[1, 4], [1, 6], [1, 2], [1, 8], [1, 0], [1, 10]]);
   atk.units.forEach(function (u, i) { B.units.push(T.unit(B, u, 'atk', aSpots[i][0], aSpots[i][1])); });
@@ -120,7 +135,7 @@ SG.T.create = function (atk, def) {
   return B;
 };
 SG.T.unit = function (B, ref, side, c, r) {
-  var o = ref.oid ? SG.O(ref.oid) : { lead: 30, war: 30, int: 20, sk: null, n: '수비병' };
+  var o = ref.oid ? SG.O(ref.oid) : { lead: SG.GUARD_STAT, war: SG.GUARD_STAT, int: 20, sk: null, n: '수비병' };
   return { id: ++B.seq, ref: ref, oid: ref.oid, side: side, c: c, r: r, n: ref.n, max: ref.n, done: false, conf: 0, t: ref.t || 'inf',
     lead: o.lead, war: o.war, int: o.int, sk: o.sk, mv: SG.itemMove ? SG.itemMove(ref.oid) : 0, name: ref.oid ? SG.name(ref.oid) : '수비병' };
 };

@@ -3,9 +3,48 @@ var SG = SG || {};
 
 SG.MAX_UNITS = 5;
 
+// 장수 한 명이 거느릴 수 있는 병사: 통솔 × 100 (출진·방어 모두)
+SG.UNIT_PER_LEAD = 100;
+// 장수 없는 「수비병」의 통솔·무력 (성을 지키는 상비군)
+SG.GUARD_STAT = 50;
+SG.unitCap = function (oid) { return oid ? Math.max(100, Math.round(SG.O(oid).lead * SG.UNIT_PER_LEAD / 100) * 100) : Infinity; };
+// 병사 total 을 장수들에게 통솔 비율로 나눈다 (각자 한도까지, 넘친 몫은 여유 있는 장수에게)
+SG.splitByLead = function (total, oids) {
+  var out = {}, left = total, open = oids.slice();
+  oids.forEach(function (o) { out[o] = 0; });
+  for (var k = 0; k < 6 && left >= 100 && open.length; k++) {
+    var w = open.reduce(function (s, o) { return s + SG.O(o).lead; }, 0) || 1, give = left;
+    open.forEach(function (o) { var add = Math.min(SG.unitCap(o) - out[o], Math.floor(give * SG.O(o).lead / w / 100) * 100); out[o] += add; left -= add; });
+    open = open.filter(function (o) { return out[o] < SG.unitCap(o); });
+  }
+  return out;
+};
+// 수비 부대를 한도에 맞춘다: 넘친 병사는 같은 병종의 여유 있는 장수에게, 그래도 남으면 장수 없는 「수비병」 (약하다)
+SG.capDefense = function (units) {
+  var over = {};
+  units.forEach(function (u) {
+    if (!u.oid) return;
+    var cap = SG.unitCap(u.oid);
+    if (u.n > cap) { over[u.t] = (over[u.t] || 0) + u.n - cap; u.n = u.max = cap; }
+  });
+  SG.TROOP_KEYS.forEach(function (t) {
+    if (!over[t]) return;
+    units.forEach(function (u) {
+      if (!over[t] || !u.oid || u.t !== t) return;
+      var add = Math.min(over[t], SG.unitCap(u.oid) - u.n);
+      if (add > 0) { u.n += add; u.max = u.n; over[t] -= add; }
+    });
+    if (over[t] > 0) {
+      var g = units.filter(function (u) { return !u.oid && u.t === t; })[0];
+      if (g) { g.n += over[t]; g.max = g.n; } else units.push({ oid: null, n: over[t], max: over[t], t: t });
+    }
+  });
+  return units;
+};
+
 // 부대 하나의 전투력
 SG.unitPower = function (oid, n, train, morale, t) {
-  var o = oid ? SG.O(oid) : { lead: 30, war: 30, sk: null };
+  var o = oid ? SG.O(oid) : { lead: SG.GUARD_STAT, war: SG.GUARD_STAT, sk: null };
   var p = n * (0.5 + (o.lead * 0.6 + o.war * 0.4) / 120) * (0.6 + train / 250) * (0.6 + morale / 250);
   if (oid && t && SG.apt(oid) === t) p *= SG.APT_BONUS;
   if (o.sk === '돌격') p *= 1.12;
@@ -54,6 +93,7 @@ SG.makeDefense = function (cid) {
     // 병종을 받지 못한 장수(장수가 병종보다 많을 때는 생기지 않음)도 부대 목록엔 넣는다
     offs.forEach(function (o) { if (!units.some(function (u) { return u.oid === o; })) units.push({ oid: o, n: 0, max: 0, t: SG.apt(o) }); });
     units.sort(function (a, b) { return SG.O(b.oid).lead - SG.O(a.oid).lead; });
+    SG.capDefense(units);
   }
   return { fid: c.owner, city: cid, units: units, train: c.train, morale: c.morale };
 };
@@ -81,6 +121,7 @@ SG.prepareAttack = function (from, to, units, supply) {
   for (var i = 0; i < units.length; i++) {
     if (!SG.ready(from, units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 출진할 수 없습니다' };
     if (units[i].n < 100) return { ok: false, msg: '부대마다 병사가 100명 이상 있어야 합니다' };
+    if (units[i].n > SG.unitCap(units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 병사를 ' + SG.fmt(SG.unitCap(units[i].oid)) + '명까지 거느릴 수 있습니다 (통솔 × 100)' };
     total += units[i].n;
   }
   if (total > c.soldiers) return { ok: false, msg: '병사가 부족합니다' };
@@ -121,13 +162,18 @@ SG.launchAttack = async function (from, to, units, supply) {
 
   if (dfid) { var r = SG.rel(fid, dfid); r.fr = Math.max(0, r.fr - 25); }
   var def = SG.makeDefense(to);
-  // 내응·매복 (계략으로 미리 꾸며 둔 일)
-  var pre = SG.preBattle ? SG.preBattle(atk, def) : { log: [], turned: [] };
-  atk.pre = pre;
   SG.log(fid, SG.forceName(fid) + ' 세력이 ' + SG.cityName(from) + '에서 ' + SG.forceName(dfid) + ' 세력의 ' +
     SG.cityName(to) + '을(를) 공격했다! (병사 ' + SG.fmt(chk.total) + ' 대 ' + SG.fmt(t.soldiers) + ')', 'war');
 
   if (SG.ui && SG.ui.attackAnim) await SG.ui.attackAnim(from, to, fid);
+  // 우리 도시가 공격받으면 수비 배치를 직접 정한다 (장수마다 병종·병사 수)
+  if (SG.isPlayer(dfid) && SG.ui && SG.ui.defenseSetup) {
+    var dset = await SG.ui.defenseSetup(atk, def);
+    if (dset && dset.units) def.units = dset.units;
+  }
+  // 내응·매복 (계략으로 미리 꾸며 둔 일)
+  var pre = SG.preBattle ? SG.preBattle(atk, def) : { log: [], turned: [] };
+  atk.pre = pre;
   var involved = SG.isPlayer(fid) || SG.isPlayer(dfid);
   var mode = 'auto';
   if (involved && SG.ui && SG.ui.battleMode) mode = await SG.ui.battleMode(atk, def);
@@ -335,8 +381,8 @@ SG.autoBattle = function (atk, def) {
     if (am < 15) { log.push('공격군의 사기가 무너져 물러났다.'); break; }
     if (dm < 10 && SG.armyTotal(def) < SG.armyTotal(atk)) { def.units.forEach(function (u) { u.n = Math.floor(u.n * 0.5); }); log.push('수비군이 겁을 먹고 흩어졌다.'); dm = 0; }
   }
-  // 전멸 부대 장수 처리
-  atk.units.concat(def.units).forEach(function (u) { if (u.oid && u.n <= 0 && !u.out) SG.unitBroken(res, u); });
+  // 전멸 부대 장수 처리 (처음부터 병사 없이 성 안에 머문 장수는 빼고)
+  atk.units.concat(def.units).forEach(function (u) { if (u.oid && u.n <= 0 && !u.out && u.max > 0) SG.unitBroken(res, u); });
   var aT2 = SG.armyTotal(atk), dT2 = SG.armyTotal(def);
   res.winner = !res.supplyOut && !res.depotLost && (dT2 <= 0 || (dm <= 0 && aT2 > 0)) && aT2 > 0 ? 'atk' : 'def';
   if (res.winner === 'def' && aT2 > 0 && dT2 > 0) log.push('공격군이 성을 함락하지 못하고 물러났다.');

@@ -187,7 +187,7 @@ SG.AI.military = async function (fid, domesticOnly) {
     if (empty && total >= 2 && c.soldiers >= 4000) {
       ready.sort(function (a, b) { return SG.O(a).lead - SG.O(b).lead; });
       var u = ready[ready.length > 1 ? 1 : 0];
-      var n0 = Math.floor(Math.min(5000, c.soldiers * 0.35));
+      var n0 = Math.floor(Math.min(5000, c.soldiers * 0.35, SG.unitCap(u)));
       var res0 = await SG.launchAttack(cid, empty, SG.assignTypes(cid, [{ oid: u, n: n0 }]));
       if (res0.ok) { attacked[empty] = true; continue; }
     }
@@ -200,8 +200,9 @@ SG.AI.military = async function (fid, domesticOnly) {
     var otherFront = targets.length > 1;
     var send = Math.floor(c.soldiers * (otherFront ? 0.65 : 0.8));
     if (send < 5000) continue;
-    var w = squad.reduce(function (s, o) { return s + SG.O(o).lead; }, 0);
-    var plan = SG.assignTypes(cid, squad.map(function (o) { return { oid: o, n: Math.floor(send * SG.O(o).lead / w / 100) * 100 }; })
+    var share = SG.splitByLead(send, squad);
+    send = squad.reduce(function (s, o) { return s + share[o]; }, 0);   // 통솔 한도 때문에 줄 수 있다
+    var plan = SG.assignTypes(cid, squad.map(function (o) { return { oid: o, n: share[o] }; })
       .filter(function (u2) { return u2.n >= 100; }));
     var myP = plan.reduce(function (s, u2) { return s + SG.unitPower(u2.oid, u2.n, c.train, c.morale, u2.t); }, 0);
     targets.forEach(function (n) {

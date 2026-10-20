@@ -496,13 +496,13 @@ SG.UI.cmdAttack = async function (cid) {
     // 도시 병력의 80% 안에서: 첫 장수는 그 절반, 다음 장수부터는 남은 몫의 절반쯤
     var budget = (pool.inf + pool.cav + pool.arc) * 0.8 - picked.reduce(function (s, x) { return s + (x !== o && alloc[x] ? alloc[x].n : 0); }, 0);
     var share = picked.length <= 1 ? 0.55 : 0.5;
-    alloc[o] = { t: t, n: Math.floor(Math.max(0, Math.min(r[t], budget * share)) / 100) * 100 };
+    alloc[o] = { t: t, n: Math.floor(Math.max(0, Math.min(r[t], budget * share, SG.unitCap(o))) / 100) * 100 };
   }
   // 「자동 배분」: 전체 병력의 80% 를 통솔 비율로, 병종은 잘 다루는 것부터
   function autoAll() {
     var tot = Math.floor((pool.inf + pool.cav + pool.arc) * 0.8 / 100) * 100;
-    var w = picked.reduce(function (s, o) { return s + SG.O(o).lead; }, 0) || 1;
-    var plan = SG.assignTypes(cid, picked.map(function (o) { return { oid: o, n: Math.floor(tot * SG.O(o).lead / w / 100) * 100 }; }));
+    var share = SG.splitByLead(tot, picked);
+    var plan = SG.assignTypes(cid, picked.map(function (o) { return { oid: o, n: share[o] }; }));
     alloc = {};
     picked.forEach(function (o) { var u = plan.filter(function (x) { return x.oid === o; })[0]; alloc[o] = u ? { t: u.t, n: u.n } : { t: SG.apt(o), n: 0 }; });
   }
@@ -541,7 +541,8 @@ SG.UI.cmdAttack = async function (cid) {
     })).concat([h('button', { class: 'btn small', type: 'button', text: '자동 배분', onclick: function () { autoAll(); renderForm(); renderInfo(); } })])));
     if (!picked.length) { formEl.appendChild(h('p', { class: 'note', text: '위에서 출진할 장수를 고르세요.' })); return; }
     picked.forEach(function (o) {
-      var a = alloc[o], ap = SG.apt(o), max = Math.max(0, remain(o)[a.t]);
+      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o), max = Math.max(0, Math.min(cap, remain(o)[a.t]));
+      if (a.n > cap) a.n = cap;
       var val = h('b', { class: 'fr-n', text: SG.fmt(a.n) });
       var rng = h('input', { type: 'range', min: 0, max: Math.max(100, max), step: 100, value: Math.min(a.n, max), oninput: function (e) {
         a.n = +e.target.value; val.textContent = SG.fmt(a.n); renderInfo(); updPool();
@@ -550,14 +551,14 @@ SG.UI.cmdAttack = async function (cid) {
         var left = remain(o)[t];
         return h('button', { type: 'button', class: 'tbtn t-' + t + (a.t === t ? ' on' : '') + (ap === t ? ' apt' : ''), title: SG.TROOPS[t].n + ' — ' + SG.TROOPS[t].desc + (ap === t ? ' · 이 장수가 잘 다루는 병종 (+12%)' : ''),
           disabled: left < 100 && a.t !== t ? true : null, onclick: function () {
-            a.t = t; a.n = Math.min(a.n || 0, Math.floor(Math.max(0, remain(o)[t]) / 100) * 100);
-            if (!a.n) a.n = Math.floor(Math.min(Math.max(0, remain(o)[t]), 5000) / 100) * 100;
+            a.t = t; a.n = Math.min(a.n || 0, Math.floor(Math.max(0, Math.min(cap, remain(o)[t])) / 100) * 100);
+            if (!a.n) a.n = Math.floor(Math.min(Math.max(0, remain(o)[t]), 5000, cap) / 100) * 100;
             renderForm(); renderInfo();
           } }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n, ap === t ? h('em', { text: '★' }) : null]);
       }));
       formEl.appendChild(h('div', { class: 'frow' }, [
         SG.UI.portrait(o, 40),
-        h('div', { class: 'fr-who' }, [h('b', { text: SG.name(o) }), h('small', { text: '통' + SG.O(o).lead + ' 무' + SG.O(o).war + ' · ' + SG.TROOPS[ap].n + '에 능함' })]),
+        h('div', { class: 'fr-who' }, [h('b', { text: SG.name(o) }), h('small', { text: '통' + SG.O(o).lead + ' 무' + SG.O(o).war + ' · ' + SG.TROOPS[ap].n + '에 능함' }), h('small', { class: 'fr-cap', text: '최대 ' + SG.fmt(cap) + '명' })]),
         types, rng, val
       ]));
     });
@@ -611,7 +612,7 @@ SG.UI.cmdAttack = async function (cid) {
         renderForm(); renderInfo();
       } });
     body.appendChild(h('div', { class: 'pick-cards', style: { maxHeight: '180px' } }, [tbl]));
-    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
+    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × 100 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
     body.appendChild(formEl);
     body.appendChild(h('div', { class: 'step' }, [h('i', { text: '四' }), '군량·군자금', h('small', { text: '챙겨 갈 식량과 금' })]));
     body.appendChild(supEl);

@@ -1716,3 +1716,7 @@ html.compact .cmdbox .cmd.card .cmd-h { font-size: 8.5px; padding-bottom: 3px; }
 .k-captive .visitor.body .v-body { filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .55)) saturate(.8); }
 .hall .visitor.body { animation-name: visitInB; }
 @keyframes visitInB { from { opacity: 0; transform: translateX(-50%) translateY(40px) scale(.94); } }
+/* 장수별 병사 한도 · 수비 배치 */
+.fr-who small.fr-cap { color: var(--bronze); }
+.defset .step i { font-size: 15px; }
+.defset-g { margin: 6px 0 0; font-size: 12.5px; color: var(--warn); }

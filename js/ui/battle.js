@@ -360,8 +360,10 @@ SG.UI.tactical = function (atk, def) {
     // 군량(공격군이 버틸 날)·우리 금
     function supChips(cls) {
       var dl = Math.floor(B.supply.food / Math.max(1, SG.T.dailyFood(B))), myGold = B.supply.gold[me];
+      var dd = Math.floor(SG.S.cities[B.city].food / Math.max(1, SG.T.dailyDefFood(B)));
       return h('div', { class: 'bt-sup ' + cls, title: '공격군 군량: 하루에 ' + SG.T.dailyFood(B) + '씩 먹습니다. 떨어지거나 보급대(粮)를 빼앗기면 공격군이 집니다' }, [
         h('span', { class: 'sup-food ' + (dl <= 3 ? 'bad' : dl <= 7 ? 'warn' : '') }, [h('i', { text: '粮' }), (me === 'atk' ? '군량 ' : '적 군량 ') + dl + '일']),
+        h('span', { class: 'sup-food ' + (dd <= 3 ? 'bad' : dd <= 7 ? 'warn' : ''), title: '수비군은 성안 식량을 하루에 ' + SG.T.dailyDefFood(B) + '씩 먹습니다. 떨어지면 병사가 달아나고, 닷새를 굶으면 항복합니다' }, [h('i', { text: '城' }), (me === 'def' ? '식량 ' : '적 성 ') + (dd > 99 ? '99+' : dd) + '일']),
         h('span', { class: 'sup-gold', title: me === 'atk' ? '챙겨 온 군자금 (매수에 씀)' : '도시 금 (매수에 씀)' }, [h('i', { text: '金' }), SG.fmt(myGold)])
       ]);
     }

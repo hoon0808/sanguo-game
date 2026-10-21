@@ -3,8 +3,8 @@ var SG = SG || {};
 
 SG.MAX_UNITS = 5;
 
-// 장수 한 명이 거느릴 수 있는 병사: 통솔 × 100 (출진·방어 모두)
-SG.UNIT_PER_LEAD = 100;
+// 장수 한 명이 거느릴 수 있는 병사: 통솔 × 150 (출진·방어 모두)
+SG.UNIT_PER_LEAD = 150;
 // 장수 없는 「수비병」의 통솔·무력 (성을 지키는 상비군)
 SG.GUARD_STAT = 50;
 SG.unitCap = function (oid) { return oid ? Math.max(100, Math.round(SG.O(oid).lead * SG.UNIT_PER_LEAD / 100) * 100) : Infinity; };
@@ -121,7 +121,7 @@ SG.prepareAttack = function (from, to, units, supply) {
   for (var i = 0; i < units.length; i++) {
     if (!SG.ready(from, units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 출진할 수 없습니다' };
     if (units[i].n < 100) return { ok: false, msg: '부대마다 병사가 100명 이상 있어야 합니다' };
-    if (units[i].n > SG.unitCap(units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 병사를 ' + SG.fmt(SG.unitCap(units[i].oid)) + '명까지 거느릴 수 있습니다 (통솔 × 100)' };
+    if (units[i].n > SG.unitCap(units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 병사를 ' + SG.fmt(SG.unitCap(units[i].oid)) + '명까지 거느릴 수 있습니다 (통솔 × ' + SG.UNIT_PER_LEAD + ')' };
     total += units[i].n;
   }
   if (total > c.soldiers) return { ok: false, msg: '병사가 부족합니다' };
@@ -361,6 +361,16 @@ SG.autoBattle = function (atk, def) {
     // 사흘치 군량
     atk.food -= SG.supplyNeed(aT, 3);
     if (atk.food < 0) { atk.food = 0; res.supplyOut = true; log.push((day * 3) + '일째: 군량이 떨어졌다! 굶주린 공격군이 물러난다.'); break; }
+    // 수비군도 성안 식량을 먹는다. 떨어지면 병사가 달아나고 사기가 꺾이며, 엿새를 굶으면 항복한다
+    var dNeed = SG.supplyNeed(dT, 3);
+    if (t.food >= dNeed) t.food -= dNeed;
+    else {
+      t.food = 0; res.hungry = (res.hungry || 0) + 1;
+      def.units.forEach(function (u) { u.n = Math.floor(u.n * 0.85); });
+      dm -= 15;
+      if (res.hungry >= 2) { res.starved = true; log.push((day * 3) + '일째: 굶주린 수비군이 성문을 열고 항복했다!'); break; }
+      log.push((day * 3) + '일째: 성안에 식량이 떨어졌다! 굶주린 수비군이 달아나기 시작한다.');
+    }
     // 수비 기병이 보급대를 노린다 (공격군이 많을수록 잘 지킨다)
     var dCav = SG.mixShare(def.units).cav || 0;
     if (SG.chance((0.012 + dCav * 0.05) * SG.clamp(dT / Math.max(1, aT), 0.3, 1))) {
@@ -384,7 +394,7 @@ SG.autoBattle = function (atk, def) {
   // 전멸 부대 장수 처리 (처음부터 병사 없이 성 안에 머문 장수는 빼고)
   atk.units.concat(def.units).forEach(function (u) { if (u.oid && u.n <= 0 && !u.out && u.max > 0) SG.unitBroken(res, u); });
   var aT2 = SG.armyTotal(atk), dT2 = SG.armyTotal(def);
-  res.winner = !res.supplyOut && !res.depotLost && (dT2 <= 0 || (dm <= 0 && aT2 > 0)) && aT2 > 0 ? 'atk' : 'def';
+  res.winner = !res.supplyOut && !res.depotLost && (dT2 <= 0 || res.starved || (dm <= 0 && aT2 > 0)) && aT2 > 0 ? 'atk' : 'def';
   if (res.winner === 'def' && aT2 > 0 && dT2 > 0) log.push('공격군이 성을 함락하지 못하고 물러났다.');
   atk.morale = am; def.morale = dm;
   return res;

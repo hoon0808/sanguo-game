@@ -587,7 +587,7 @@ SG.UI.cmdAttack = async function (cid) {
     info.appendChild(h('div', { class: 'vs' }, [
       SG.UI.vsSide(cid, c.owner, '우리 군 · ' + SG.cityName(cid), p.map(function (u) { return u.oid; }), '병사 ' + SG.fmt(sent) + ' (' + mixLine(mm) + ')', 'me'),
       h('div', { class: 'mid' }, [h('span', { text: '對' })]),
-      SG.UI.vsSide(target, t.owner, SG.cityName(target) + ' · ' + (t.owner ? SG.forceName(t.owner) : '공백지'), defOffs, '병사 ' + SG.fmt(t.soldiers) + ' (' + mixLine(tp) + ') · 성벽 ' + t.wall, 'foe')
+      SG.UI.vsSide(target, t.owner, SG.cityName(target) + ' · ' + (t.owner ? SG.forceName(t.owner) : '공백지'), defOffs, '병사 ' + SG.fmt(t.soldiers) + ' (' + mixLine(tp) + ') · 성벽 ' + t.wall + ' · 식량 ' + SG.fmt(t.food), 'foe')
     ]));
     info.appendChild(h('div', { class: 'verdict-row' }, [
       h('div', { class: 'power' }, [h('i', { class: 'pw-me', style: { width: share + '%' } }, [h('b', { text: '우리 ' + share + '%' })]),
@@ -612,7 +612,7 @@ SG.UI.cmdAttack = async function (cid) {
         renderForm(); renderInfo();
       } });
     body.appendChild(h('div', { class: 'pick-cards', style: { maxHeight: '180px' } }, [tbl]));
-    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × 100 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
+    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × 150 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
     body.appendChild(formEl);
     body.appendChild(h('div', { class: 'step' }, [h('i', { text: '四' }), '군량·군자금', h('small', { text: '챙겨 갈 식량과 금' })]));
     body.appendChild(supEl);

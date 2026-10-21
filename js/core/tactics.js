@@ -447,6 +447,8 @@ SG.T.strategy = function (B, u, t, kind) {
 };
 
 // ---- 보급·매수
+// 수비군이 하루에 먹는 성안 식량
+SG.T.dailyDefFood = function (B) { return SG.supplyNeed(SG.T.alive(B, 'def').reduce(function (s, u) { return s + u.n; }, 0), 1); };
 SG.T.dailyFood = function (B) { return SG.supplyNeed(SG.T.alive(B, 'atk').reduce(function (s, u) { return s + u.n; }, 0), 1); };
 // 매수: 3칸 안의 적 장수를 금으로 꾀어 편을 바꾸게 한다 (군주와 그 가족은 넘어오지 않음)
 SG.T.bribeTargets = function (B, u) {
@@ -551,6 +553,18 @@ SG.T.endSide = function (B) {
     if (B.supply) {
       B.supply.food -= SG.T.dailyFood(B);
       if (B.supply.food < 0) { B.supply.food = 0; B.over = 'def'; B.supplyOut = true; B.log.push('군량이 떨어졌다! 굶주린 공격군이 물러난다.'); }
+    }
+    // 수비군은 성안 식량을 먹는다. 떨어지면 날마다 병사가 달아나고 사기가 꺾이며, 닷새를 굶으면 항복한다
+    var city = SG.S.cities[B.city], dF = SG.T.dailyDefFood(B);
+    if (!B.over && dF > 0) {
+      if (city.food >= dF) city.food -= dF;
+      else {
+        city.food = 0; B.hungry = (B.hungry || 0) + 1;
+        SG.T.alive(B, 'def').forEach(function (u) { u.n = Math.max(0, Math.floor(u.n * 0.92)); });
+        B.morale.def = Math.max(0, B.morale.def - 10);
+        if (B.hungry >= 5) { B.over = 'atk'; B.starved = true; B.log.push('굶주린 수비군이 성문을 열고 항복했다!'); }
+        else B.log.push('성안에 식량이 떨어졌다! 굶주린 수비군이 달아난다 (' + B.hungry + '일째, 닷새면 항복).');
+      }
     }
     if (!B.over && B.day > SG.T.DAYS) { B.over = 'def'; B.log.push(SG.T.DAYS + '일이 지나 공격군이 지쳐 물러난다.'); }
   }

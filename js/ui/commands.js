@@ -542,8 +542,22 @@ SG.UI.cmdAttack = async function (cid) {
   }
 
   // ---- 부대 편성: 장수마다 병종과 병사 수
+  // o 에게 병종 t 병사 want 명을 맡긴다: 도시에 남은 병사로 모자라면 같은 병종의 다른 부대(통솔 낮은 장수부터)에게서 가져온다
+  function grab(o, t, want) {
+    var a = alloc[o]; a.t = t; a.n = 0;
+    var need = want - Math.max(0, remain(o)[t]);
+    if (need > 0) {
+      picked.filter(function (x) { return x !== o && alloc[x] && alloc[x].t === t && alloc[x].n > 0; })
+        .sort(function (x, y) { return SG._oNoDep(x).lead - SG._oNoDep(y).lead; })
+        .forEach(function (x) { if (need <= 0) return; var take = Math.min(alloc[x].n, need); alloc[x].n -= take; need -= take; });
+      want -= Math.max(0, need);
+    }
+    a.n = Math.max(0, Math.floor(want / 100) * 100);
+  }
+  var rows = {};
+  function updRows() { Object.keys(rows).forEach(function (x) { rows[x].val.textContent = SG.fmt(alloc[x].n); if (rows[x].rng !== document.activeElement) rows[x].rng.value = alloc[x].n; }); }
   function renderForm() {
-    formEl.innerHTML = '';
+    formEl.innerHTML = ''; rows = {};
     var r = remain(null);
     formEl.appendChild(h('div', { class: 'pool' }, [h('span', { class: 'pool-h', text: SG.cityName(cid) + '에 남는 병력' })].concat(SG.TROOP_KEYS.map(function (t) {
       return h('span', { class: 'pool-c t-' + t + (r[t] < 0 ? ' over' : '') }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n + ' ', h('b', { text: SG.fmt(r[t]) }), h('small', { text: ' / ' + SG.fmt(pool[t]) })]);
@@ -552,18 +566,19 @@ SG.UI.cmdAttack = async function (cid) {
       h('button', { class: 'btn small', type: 'button', text: '자동 배분', onclick: function () { autoAll(); renderForm(); renderInfo(); } })])));
     if (!picked.length) { formEl.appendChild(h('p', { class: 'note', text: '위에서 출진할 장수를 고르세요.' })); return; }
     picked.forEach(function (o) {
-      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o, a.dep), max = Math.max(0, Math.min(cap, remain(o)[a.t])), st = SG.depStats(o, a.dep), st0 = SG.depStats(o);
+      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o, a.dep), max = Math.max(0, Math.min(cap, pool[a.t])), st = SG.depStats(o, a.dep), st0 = SG.depStats(o);
       if (a.n > cap) a.n = cap;
       var val = h('b', { class: 'fr-n', text: SG.fmt(a.n) });
+      // 막대: 이 병종 병사 전부까지 (도시에 남은 병사로 모자라면 다른 부대에게서 가져옴)
       var rng = h('input', { type: 'range', min: 0, max: Math.max(100, max), step: 100, value: Math.min(a.n, max), oninput: function (e) {
-        a.n = +e.target.value; val.textContent = SG.fmt(a.n); renderInfo(); updPool();
-      } });
+        grab(o, a.t, Math.min(+e.target.value, max)); updRows(); renderInfo(); updPool();
+      }, onchange: function () { renderForm(); renderInfo(); } });
+      rows[o] = { rng: rng, val: val };
       var types = h('div', { class: 'tsel' }, SG.TROOP_KEYS.map(function (t) {
-        var left = remain(o)[t];
         return h('button', { type: 'button', class: 'tbtn t-' + t + (a.t === t ? ' on' : '') + (ap === t ? ' apt' : ''), title: SG.TROOPS[t].n + ' — ' + SG.TROOPS[t].desc + (ap === t ? ' · 이 장수가 잘 다루는 병종 (+12%)' : ''),
-          disabled: left < 100 && a.t !== t ? true : null, onclick: function () {
-            a.t = t; a.n = Math.min(a.n || 0, Math.floor(Math.max(0, Math.min(cap, remain(o)[t])) / 100) * 100);
-            if (!a.n) a.n = Math.floor(Math.min(Math.max(0, remain(o)[t]), 5000, cap) / 100) * 100;
+          disabled: pool[t] < 100 && a.t !== t ? true : null, onclick: function () {
+            if (a.t === t) return;
+            grab(o, t, Math.min(cap, pool[t], a.n || 5000));   // 모자라면 같은 병종의 다른 부대에게서 가져온다
             renderForm(); renderInfo();
           } }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n, ap === t ? h('em', { text: '★' }) : null]);
       }));

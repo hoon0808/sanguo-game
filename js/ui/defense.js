@@ -64,13 +64,30 @@ SG.ui.defenseSetup = async function (atk, def) {
     if (g > 0) info.appendChild(h('p', { class: 'note defset-g', text: '장수에게 맡기지 않은 병사 ' + SG.fmt(g) + '명은 장수 없는 「수비병」으로 싸웁니다 (통솔·무력 50 정도로, 뛰어난 장수가 맡는 것보다 약함).' }));
   }
 
+  // o 에게 병종 t 병사 want 명을 맡긴다: 남는 병사로 모자라면 같은 병종의 다른 장수(통솔 낮은 장수부터)에게서 가져온다
+  function grab(o, t, want) {
+    var a = alloc[o]; a.t = t; a.n = 0;
+    var need = want - Math.max(0, remain(null)[t]);
+    if (need > 0) {
+      offs.filter(function (x) { return x !== o && !depOf(x) && alloc[x].t === t && alloc[x].n > 0; })
+        .sort(function (x, y) { return SG._oNoDep(x).lead - SG._oNoDep(y).lead; })
+        .forEach(function (x) { if (need <= 0) return; var take = Math.min(alloc[x].n, need); alloc[x].n -= take; need -= take; if (!alloc[x].n) alloc[x].dep = null; });
+      want -= Math.max(0, need);
+    }
+    a.n = Math.max(0, want);
+  }
+  var rows = {};
+  function updRows() {
+    Object.keys(rows).forEach(function (x) { var rw = rows[x]; rw.val.textContent = alloc[x].n ? SG.fmt(alloc[x].n) : '성 안'; if (rw.rng !== document.activeElement) rw.rng.value = alloc[x].n; });
+  }
   function renderForm() {
-    formEl.innerHTML = '';
+    formEl.innerHTML = ''; rows = {};
     var r = remain(null);
     formEl.appendChild(h('div', { class: 'pool' }, [h('span', { class: 'pool-h', text: '장수 없이 남는 병사' })].concat(SG.TROOP_KEYS.map(function (t) {
       return h('span', { class: 'pool-c t-' + t + (r[t] < 0 ? ' over' : '') }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n + ' ', h('b', { text: SG.fmt(r[t]) }), h('small', { text: ' / ' + SG.fmt(pool[t]) })]);
     })).concat([
       h('button', { class: 'btn small', type: 'button', text: '부장 자동', title: '성 안에 머무는(0명) 장수를 병사가 많은 부대부터 부장으로 붙입니다', onclick: function () { autoDeps(); renderForm(); renderInfo(); } }),
+      h('button', { class: 'btn small', type: 'button', text: '모두 비우기', title: '모든 장수의 병사를 0명으로 돌려 처음부터 나눕니다', onclick: function () { offs.forEach(function (x) { alloc[x].n = 0; alloc[x].dep = null; }); renderForm(); renderInfo(); } }),
       h('button', { class: 'btn small', type: 'button', text: '모두 맡기기', title: '남는 병사를 여유 있는 장수에게 통솔 순서로 채웁니다', onclick: function () { fillAll(); renderForm(); renderInfo(); } }),
       h('button', { class: 'btn small', type: 'button', text: '자동 배치', onclick: function () { fromUnits(auto); renderForm(); renderInfo(); } })
     ])));
@@ -85,20 +102,20 @@ SG.ui.defenseSetup = async function (atk, def) {
           h('b', { class: 'fr-n', text: '부장' })]));
         return;
       }
-      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o, a.n > 0 ? a.dep : null), max = Math.max(0, Math.min(cap, a.n + remain(null)[a.t]));
+      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o, a.n > 0 ? a.dep : null), max = Math.max(0, Math.min(cap, pool[a.t]));
       var st = SG.depStats(o, a.n > 0 ? a.dep : null), st0 = SG.depStats(o), hasDep = a.n > 0 && a.dep;
       var val = h('b', { class: 'fr-n', text: a.n ? SG.fmt(a.n) : '성 안' });
-      var rng = h('input', { type: 'range', min: 0, max: Math.max(100, Math.floor(max / 100) * 100), step: 100, value: a.n, oninput: function (e) {
-        var was = a.n; a.n = Math.min(+e.target.value, max); val.textContent = a.n ? SG.fmt(a.n) : '성 안';
-        if (!was !== !a.n) { if (!a.n) a.dep = null; renderForm(); renderInfo(); return; }   // 0명이 되거나 0명에서 벗어나면 부장 고르기가 바뀐다
-        renderInfo(); updPool();
-      } });
+      // 막대: 이 병종 병사 전부까지 (모자라면 다른 장수에게서 가져옴). 손을 떼면 다시 그린다
+      var rng = h('input', { type: 'range', min: 0, max: Math.max(100, max), step: 100, value: a.n, oninput: function (e) {
+        grab(o, a.t, Math.min(+e.target.value, max)); if (!a.n) a.dep = null;
+        updRows(); renderInfo(); updPool();
+      }, onchange: function () { renderForm(); renderInfo(); } });
+      rows[o] = { rng: rng, val: val };
       var types = h('div', { class: 'tsel' }, SG.TROOP_KEYS.map(function (t) {
-        var left = remain(o)[t];
         return h('button', { type: 'button', class: 'tbtn t-' + t + (a.t === t ? ' on' : '') + (ap === t ? ' apt' : ''), title: SG.TROOPS[t].n + ' — ' + SG.TROOPS[t].desc + (ap === t ? ' · 이 장수가 잘 다루는 병종 (+12%)' : ''),
-          disabled: left < 100 && a.t !== t ? true : null, onclick: function () {
+          disabled: pool[t] < 100 && a.t !== t ? true : null, onclick: function () {
             if (a.t === t) return;
-            a.n = Math.floor(Math.max(0, Math.min(cap, remain(o)[t], a.n || cap)) / 100) * 100; a.t = t;
+            grab(o, t, Math.min(cap, pool[t], a.n || 5000));   // 모자라면 같은 병종의 다른 장수에게서 가져온다
             renderForm(); renderInfo();
           } }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n, ap === t ? h('em', { text: '★' }) : null]);
       }));

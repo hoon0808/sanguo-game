@@ -1,5 +1,5 @@
 // 수비 배치: 우리 도시가 공격받으면 싸우기 전에 장수마다 병종·병사 수를 정한다
-// (한 장수가 거느릴 수 있는 병사는 통솔 × 150, 장수에게 맡기지 않은 병사는 장수 없는 「수비병」으로 약하게 싸운다)
+// (한 장수가 거느릴 수 있는 병사는 통솔 × 300, 장수에게 맡기지 않은 병사는 장수 없는 「수비병」으로 약하게 싸운다)
 var SG = SG || {};
 SG.ui = SG.ui || {};
 
@@ -97,7 +97,7 @@ SG.ui.defenseSetup = async function (atk, def) {
     });
   }
 
-  body.appendChild(h('div', { class: 'step' }, [h('i', { text: '守' }), '수비 배치', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × 150 · 0명이면 싸우지 않고 성 안에 머뭅니다' })]));
+  body.appendChild(h('div', { class: 'step' }, [h('i', { text: '守' }), '수비 배치', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × ' + SG.UNIT_PER_LEAD + ' · 0명이면 싸우지 않고 성 안에 머뭅니다' })]));
   body.appendChild(info);
   body.appendChild(formEl);
   renderForm(); renderInfo();

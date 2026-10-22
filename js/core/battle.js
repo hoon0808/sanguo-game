@@ -3,8 +3,8 @@ var SG = SG || {};
 
 SG.MAX_UNITS = 5;
 
-// 장수 한 명이 거느릴 수 있는 병사: 통솔 × 150 (출진·방어 모두)
-SG.UNIT_PER_LEAD = 150;
+// 장수 한 명이 거느릴 수 있는 병사: 통솔 × 300 (출진·방어 모두)
+SG.UNIT_PER_LEAD = 300;
 // 장수 없는 「수비병」의 통솔·무력 (성을 지키는 상비군)
 SG.GUARD_STAT = 50;
 SG.unitCap = function (oid) { return oid ? Math.max(100, Math.round(SG.O(oid).lead * SG.UNIT_PER_LEAD / 100) * 100) : Infinity; };

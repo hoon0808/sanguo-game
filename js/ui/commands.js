@@ -612,7 +612,7 @@ SG.UI.cmdAttack = async function (cid) {
         renderForm(); renderInfo();
       } });
     body.appendChild(h('div', { class: 'pick-cards', style: { maxHeight: '180px' } }, [tbl]));
-    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × 150 · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
+    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × ' + SG.UNIT_PER_LEAD + ' · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
     body.appendChild(formEl);
     body.appendChild(h('div', { class: 'step' }, [h('i', { text: '四' }), '군량·군자금', h('small', { text: '챙겨 갈 식량과 금' })]));
     body.appendChild(supEl);

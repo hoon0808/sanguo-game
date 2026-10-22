@@ -501,12 +501,21 @@ SG.UI.cmdAttack = async function (cid) {
   // 「자동 배분」: 전체 병력의 80% 를 통솔 비율로, 병종은 잘 다루는 것부터
   function autoAll() {
     var tot = Math.floor((pool.inf + pool.cav + pool.arc) * 0.8 / 100) * 100;
-    var share = SG.splitByLead(tot, picked);
-    var plan = SG.assignTypes(cid, picked.map(function (o) { return { oid: o, n: share[o] }; }));
+    var share = SG.withDeps(plan(), function () { return SG.splitByLead(tot, picked); });
+    var pl = SG.assignTypes(cid, picked.map(function (o) { return { oid: o, n: share[o] }; }));
+    var deps = {}; picked.forEach(function (o) { deps[o] = alloc[o] && alloc[o].dep; });
     alloc = {};
-    picked.forEach(function (o) { var u = plan.filter(function (x) { return x.oid === o; })[0]; alloc[o] = u ? { t: u.t, n: u.n } : { t: SG.apt(o), n: 0 }; });
+    picked.forEach(function (o) { var u = pl.filter(function (x) { return x.oid === o; })[0]; alloc[o] = u ? { t: u.t, n: u.n, dep: deps[o] } : { t: SG.apt(o), n: 0, dep: deps[o] }; });
   }
-  function plan() { return picked.map(function (o) { return { oid: o, n: alloc[o] ? alloc[o].n : 0, t: alloc[o] ? alloc[o].t : 'inf' }; }); }
+  function plan() { return picked.map(function (o) { return { oid: o, n: alloc[o] ? alloc[o].n : 0, t: alloc[o] ? alloc[o].t : 'inf', dep: alloc[o] && alloc[o].dep || null }; }); }
+  // 부장: 주장으로 고르지 않은 장수 중에서 부대마다 한 명
+  function depOf(x) { for (var i = 0; i < picked.length; i++) if (alloc[picked[i]] && alloc[picked[i]].dep === x) return picked[i]; return null; }
+  function depFree(o) { return ready.filter(function (x) { return picked.indexOf(x) < 0 && (!depOf(x) || depOf(x) === o); }); }
+  function autoDeps() {
+    var free = ready.filter(function (x) { return picked.indexOf(x) < 0; })
+      .sort(function (a, b) { var A = SG._oNoDep(a), B = SG._oNoDep(b); return (B.lead + B.war) - (A.lead + A.war); });
+    picked.slice().sort(function (a, b) { return alloc[b].n - alloc[a].n; }).forEach(function (o) { alloc[o].dep = free.shift() || null; });
+  }
   picked.push(ready[0]); autoOne(ready[0]);
   // ---- 군량·군자금: 군량은 하루에 병사 1,000명당 1씩 먹고(10일치 이상), 금은 전투 중 적 장수 매수에 쓴다
   var sup = { food: null, gold: Math.min(Math.floor(c.gold * 0.3 / 10) * 10, 800), touched: false };
@@ -538,10 +547,12 @@ SG.UI.cmdAttack = async function (cid) {
     var r = remain(null);
     formEl.appendChild(h('div', { class: 'pool' }, [h('span', { class: 'pool-h', text: SG.cityName(cid) + '에 남는 병력' })].concat(SG.TROOP_KEYS.map(function (t) {
       return h('span', { class: 'pool-c t-' + t + (r[t] < 0 ? ' over' : '') }, [h('i', { text: SG.TROOPS[t].h }), SG.TROOPS[t].n + ' ', h('b', { text: SG.fmt(r[t]) }), h('small', { text: ' / ' + SG.fmt(pool[t]) })]);
-    })).concat([h('button', { class: 'btn small', type: 'button', text: '자동 배분', onclick: function () { autoAll(); renderForm(); renderInfo(); } })])));
+    })).concat([
+      h('button', { class: 'btn small', type: 'button', text: '부장 자동', title: '남는 장수를 병사가 많은 부대부터 부장으로 붙입니다', onclick: function () { autoDeps(); renderForm(); renderInfo(); } }),
+      h('button', { class: 'btn small', type: 'button', text: '자동 배분', onclick: function () { autoAll(); renderForm(); renderInfo(); } })])));
     if (!picked.length) { formEl.appendChild(h('p', { class: 'note', text: '위에서 출진할 장수를 고르세요.' })); return; }
     picked.forEach(function (o) {
-      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o), max = Math.max(0, Math.min(cap, remain(o)[a.t]));
+      var a = alloc[o], ap = SG.apt(o), cap = SG.unitCap(o, a.dep), max = Math.max(0, Math.min(cap, remain(o)[a.t])), st = SG.depStats(o, a.dep), st0 = SG.depStats(o);
       if (a.n > cap) a.n = cap;
       var val = h('b', { class: 'fr-n', text: SG.fmt(a.n) });
       var rng = h('input', { type: 'range', min: 0, max: Math.max(100, max), step: 100, value: Math.min(a.n, max), oninput: function (e) {
@@ -558,7 +569,15 @@ SG.UI.cmdAttack = async function (cid) {
       }));
       formEl.appendChild(h('div', { class: 'frow' }, [
         SG.UI.portrait(o, 40),
-        h('div', { class: 'fr-who' }, [h('b', { text: SG.name(o) }), h('small', { text: '통' + SG.O(o).lead + ' 무' + SG.O(o).war + ' · ' + SG.TROOPS[ap].n + '에 능함' }), h('small', { class: 'fr-cap', text: '최대 ' + SG.fmt(cap) + '명' })]),
+        h('div', { class: 'fr-who' }, [h('b', { text: SG.name(o) }),
+          h('small', { class: a.dep ? 'fr-up' : '', text: '통' + st.lead + ' 무' + st.war + (a.dep ? ' (부장 +' + (st.lead - st0.lead) + '/+' + (st.war - st0.war) + ')' : '') + ' · ' + SG.TROOPS[ap].n + '에 능함' }),
+          h('small', { class: 'fr-cap', text: '최대 ' + SG.fmt(cap) + '명' }),
+          h('select', { class: 'fr-dep', title: '부장: 능력(통솔·무력·지력)의 ' + Math.round(SG.DEP_RATE * 100) + '%를 보태고, 주장이 일기토에서 잡히거나 죽으면 대신 부대를 이끕니다', onchange: function (e) {
+            a.dep = e.target.value || null; renderForm(); renderInfo();
+          } }, [h('option', { value: '', text: '부장 없음' })].concat(depFree(o).map(function (x) {
+            var xo = SG._oNoDep(x);
+            return h('option', { value: x, selected: a.dep === x ? true : null, text: '副 ' + SG.name(x) + ' 통' + xo.lead + '·무' + xo.war });
+          })))]),
         types, rng, val
       ]));
     });
@@ -574,7 +593,7 @@ SG.UI.cmdAttack = async function (cid) {
     var t = S.cities[target];
     var p = plan();
     var dS = t.owner ? SG.mixShare(SG.makeDefense(target).units) : { inf: 1, cav: 0, arc: 0 };
-    var myP = p.reduce(function (s, u) { return s + SG.unitPower(u.oid, u.n, c.train, c.morale, u.t) * SG.matchVs(u.t, dS); }, 0);
+    var myP = SG.withDeps(p, function () { return p.reduce(function (s, u) { return s + SG.unitPower(u.oid, u.n, c.train, c.morale, u.t) * SG.matchVs(u.t, dS); }, 0); });
     var dP = t.owner ? SG.AI.cityDefense(target) : 0;
     var ratio = dP ? myP / dP : 99;
     var verdict = !t.owner && t.soldiers <= 0 ? '빈 도시 — 싸우지 않고 차지합니다' :
@@ -585,7 +604,7 @@ SG.UI.cmdAttack = async function (cid) {
     var vcls = !t.owner && t.soldiers <= 0 ? 'good' : ratio > 1.5 ? 'good' : ratio > 1.1 ? 'even' : 'bad';
     function mixLine(m) { return SG.TROOP_KEYS.filter(function (k) { return m[k] > 0; }).map(function (k) { return SG.TROOPS[k].h + ' ' + SG.fmt(m[k]); }).join(' · ') || '없음'; }
     info.appendChild(h('div', { class: 'vs' }, [
-      SG.UI.vsSide(cid, c.owner, '우리 군 · ' + SG.cityName(cid), p.map(function (u) { return u.oid; }), '병사 ' + SG.fmt(sent) + ' (' + mixLine(mm) + ')', 'me'),
+      SG.UI.vsSide(cid, c.owner, '우리 군 · ' + SG.cityName(cid), p.map(function (u) { return u.oid; }).concat(p.map(function (u) { return u.dep; }).filter(Boolean)), '병사 ' + SG.fmt(sent) + ' (' + mixLine(mm) + ')', 'me'),
       h('div', { class: 'mid' }, [h('span', { text: '對' })]),
       SG.UI.vsSide(target, t.owner, SG.cityName(target) + ' · ' + (t.owner ? SG.forceName(t.owner) : '공백지'), defOffs, '병사 ' + SG.fmt(t.soldiers) + ' (' + mixLine(tp) + ') · 성벽 ' + t.wall + ' · 식량 ' + SG.fmt(t.food), 'foe')
     ]));
@@ -604,7 +623,8 @@ SG.UI.cmdAttack = async function (cid) {
       stat: function (o) { return { label: '통/무', value: SG.O(o).lead + '/' + SG.O(o).war, hi: SG.O(o).lead + SG.O(o).war >= 170 }; },
       extra: function (o) { var ap = SG.apt(o); return SG.TROOPS[ap].h + ' ' + SG.TROOPS[ap].n + '에 능함'; },
       onPick: function (o, card) {
-        var i = picked.indexOf(o);
+        var i = picked.indexOf(o), was = depOf(o);
+        if (was) { alloc[was].dep = null; SG.UI.toast(SG.name(o) + '을(를) 부장에서 빼고 주장으로 세웁니다'); }
         if (i >= 0) { picked.splice(i, 1); delete alloc[o]; }
         else if (picked.length < SG.MAX_UNITS) { picked.push(o); autoOne(o); }
         else SG.UI.toast('최대 ' + SG.MAX_UNITS + '명까지입니다', true);
@@ -612,7 +632,7 @@ SG.UI.cmdAttack = async function (cid) {
         renderForm(); renderInfo();
       } });
     body.appendChild(h('div', { class: 'pick-cards', style: { maxHeight: '180px' } }, [tbl]));
-    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '장수마다 병종과 병사 수를 정합니다 · 거느릴 수 있는 병사는 통솔 × ' + SG.UNIT_PER_LEAD + ' · ★ 잘 다루는 병종(+12%) · 보병>기병>궁병>보병 상성' })]));
+    body.appendChild(h('div', { class: 'step' }, [h('i', { text: '三' }), '부대 편성', h('small', { text: '병종·병사 수·부장 · 한도 통솔 × ' + SG.UNIT_PER_LEAD + ' · 부장은 능력 ' + Math.round(SG.DEP_RATE * 100) + '%를 보태고 주장이 잡히면 대신 이끎 · ★ 잘 다루는 병종 +12%' })]));
     body.appendChild(formEl);
     body.appendChild(h('div', { class: 'step' }, [h('i', { text: '四' }), '군량·군자금', h('small', { text: '챙겨 갈 식량과 금' })]));
     body.appendChild(supEl);

@@ -204,7 +204,8 @@ SG.AI.military = async function (fid, domesticOnly) {
     send = squad.reduce(function (s, o) { return s + share[o]; }, 0);   // 통솔 한도 때문에 줄 수 있다
     var plan = SG.assignTypes(cid, squad.map(function (o) { return { oid: o, n: share[o] }; })
       .filter(function (u2) { return u2.n >= 100; }));
-    var myP = plan.reduce(function (s, u2) { return s + SG.unitPower(u2.oid, u2.n, c.train, c.morale, u2.t); }, 0);
+    if (SG.aiDeputies) SG.aiDeputies(cid, plan, 1);   // 남는 장수는 부장으로 (한 명은 도시에 남김)
+    var myP = SG.withDeps(plan, function () { return plan.reduce(function (s, u2) { return s + SG.unitPower(u2.oid, u2.n, c.train, c.morale, u2.t); }, 0); });
     targets.forEach(function (n) {
       var t = SG.S.cities[n];
       if (!t.owner) return;

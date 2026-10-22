@@ -136,7 +136,7 @@ SG.T.create = function (atk, def) {
 };
 SG.T.unit = function (B, ref, side, c, r) {
   var o = ref.oid ? SG.O(ref.oid) : { lead: SG.GUARD_STAT, war: SG.GUARD_STAT, int: 20, sk: null, n: '수비병' };
-  return { id: ++B.seq, ref: ref, oid: ref.oid, side: side, c: c, r: r, n: ref.n, max: ref.n, done: false, conf: 0, t: ref.t || 'inf',
+  return { id: ++B.seq, ref: ref, oid: ref.oid, dep: ref.dep || null, side: side, c: c, r: r, n: ref.n, max: ref.n, done: false, conf: 0, t: ref.t || 'inf',
     lead: o.lead, war: o.war, int: o.int, sk: o.sk, mv: SG.itemMove ? SG.itemMove(ref.oid) : 0, name: ref.oid ? SG.name(ref.oid) : '수비병' };
 };
 SG.T.at = function (B, c, r) {
@@ -411,6 +411,10 @@ SG.T.broken = function (B, u) {
     u.ref.oidLost = u.oid; u.ref.oid = null; u.ref.out = true;
     B.log.push('  ' + u.name + '이(가) 사로잡혔다!');
   }
+  if (u.ref.dep && SG.chance(0.35)) {
+    B.captured.push({ oid: u.ref.dep, by: u.side === 'atk' ? 'def' : 'atk' });
+    B.log.push('  부장 ' + SG.name(u.ref.dep) + '도 사로잡혔다!');
+  }
 };
 
 // ---- 계략 (화계·혼란): 2칸 안의 적
@@ -471,6 +475,8 @@ SG.T.bribe = function (B, u, t) {
     B.supply.gold[sd] -= price;
     t.side = sd; t.turned = true; t.done = true; t.conf = 0;
     B.turned.push({ oid: t.oid, to: sd });
+    // 부장은 따라가지 않고 제 진영에 남는다
+    if (t.ref.dep) { delete SG._deps[t.oid]; t.ref.dep = null; }
     msg = u.name + '이(가) 금 ' + SG.fmt(price) + '(으)로 ' + t.name + '을(를) 매수했다! ' + t.name + ' 부대가 ' + (bf ? SG.forceName(bf) : '') + ' 쪽으로 돌아섰다.';
     SG.T.moraleShift(B, sd, 4);
   } else {
@@ -515,6 +521,17 @@ SG.T.duel = function (B, a, d, accepted, pre) {
   } else {
     if (r.fate === 'killed') B.killed.push(lu.oid);
     else B.captured.push({ oid: lu.oid, by: wu.side });
+    // 부장이 있으면 지휘를 이어받아 부대가 남는다
+    var lost = lu.oid, nd = SG.depTakeOver ? SG.depTakeOver(lu.ref) : null;
+    if (nd) {
+      var no = SG.O(nd);
+      lu.oid = nd; lu.lead = no.lead; lu.war = no.war; lu.int = no.int; lu.sk = no.sk; lu.name = SG.name(nd); lu.dep = null;
+      lu.mv = SG.itemMove ? SG.itemMove(nd) : 0;
+      lu.n = Math.floor(lu.n * 0.85); lu.conf = Math.max(lu.conf, 1);
+      B.log.push('부장 ' + lu.name + '이(가) ' + SG.name(lost) + ' 대신 부대를 이끈다!');
+      SG.T.checkEnd(B);
+      return r;
+    }
     // 장수를 잃은 부대는 흩어진다 (절반은 살아 돌아감)
     lu.ref.oidLost = lu.oid; lu.ref.oid = null; lu.ref.out = true;
     lu.ref.n = Math.floor(lu.n * 0.5);

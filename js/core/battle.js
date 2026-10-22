@@ -121,10 +121,12 @@ SG.prepareAttack = function (from, to, units, supply) {
   for (var i = 0; i < units.length; i++) {
     if (!SG.ready(from, units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 출진할 수 없습니다' };
     if (units[i].n < 100) return { ok: false, msg: '부대마다 병사가 100명 이상 있어야 합니다' };
-    if (units[i].n > SG.unitCap(units[i].oid)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 병사를 ' + SG.fmt(SG.unitCap(units[i].oid)) + '명까지 거느릴 수 있습니다 (통솔 × ' + SG.UNIT_PER_LEAD + ')' };
+    if (units[i].n > SG.unitCap(units[i].oid, units[i].dep)) return { ok: false, msg: SG.name(units[i].oid) + '은(는) 병사를 ' + SG.fmt(SG.unitCap(units[i].oid, units[i].dep)) + '명까지 거느릴 수 있습니다 (통솔 × ' + SG.UNIT_PER_LEAD + ')' };
     total += units[i].n;
   }
   if (total > c.soldiers) return { ok: false, msg: '병사가 부족합니다' };
+  var depErr = SG.checkDeps ? SG.checkDeps(from, units) : null;
+  if (depErr) return { ok: false, msg: depErr };
   var pool = SG.cityTroops(from), need = SG.unitsMix(units);
   for (var k = 0; k < SG.TROOP_KEYS.length; k++) {
     var tk = SG.TROOP_KEYS[k];
@@ -442,6 +444,9 @@ SG.applyDuelFate = function (res, unit, fate, winnerSide) {
   else if (fate === 'captured') { res.captured.push({ oid: unit.oid, by: winnerSide }); unit.out = true; }
   else unit.n = Math.floor(unit.n * 0.7);
   if (unit.out) {
+    // 부장이 있으면 지휘를 이어받는다 (조금만 흩어짐)
+    var lost = unit.oid, nd = SG.depTakeOver ? SG.depTakeOver(unit) : null;
+    if (nd) { unit.n = Math.floor(unit.n * 0.85); res.log.push('부장 ' + SG.name(nd) + '이(가) ' + SG.name(lost) + ' 대신 부대를 이끈다!'); return; }
     // 장수를 잃은 부대는 절반이 흩어지고 나머지는 남는다 (장수 없는 부대)
     unit.n = Math.floor(unit.n * 0.5);
     unit.oidLost = unit.oid; unit.oid = null;
@@ -451,6 +456,7 @@ SG.applyDuelFate = function (res, unit, fate, winnerSide) {
 SG.unitBroken = function (res, u) {
   u.out = true;
   if (SG.chance(0.35)) res.captured.push({ oid: u.oid, by: null });
+  if (u.dep && SG.chance(0.35)) res.captured.push({ oid: u.dep, by: null });
 };
 
 // ---- 전투 뒤 처리
@@ -460,7 +466,7 @@ SG.finishBattle = async function (atk, def, res) {
   var captives = [];
   // 일기토·전멸로 잡힌 장수: 잡은 쪽 = 상대편
   res.captured.forEach(function (cp) {
-    var isAtkUnit = atk.units.some(function (u) { return (u.oid || u.oidLost) === cp.oid; });
+    var isAtkUnit = atk.units.some(function (u) { return u.oid === cp.oid || u.oidLost === cp.oid || u.dep === cp.oid; });
     captives.push({ oid: cp.oid, by: isAtkUnit ? dfid : fid });
   });
   var lordsLost = [];
@@ -530,8 +536,7 @@ SG.takeCity = function (atk, to) {
   t.morale = SG.clamp(atk.morale, 20, 100);
   t.deleg = false;
   atk.units.forEach(function (u) {
-    var oid = u.oid || null;
-    if (oid && SG.S.off[oid].s === 'force') SG.S.off[oid].c = to;
+    [u.oid, u.dep].forEach(function (oid) { if (oid && SG.S.off[oid].s === 'force' && SG.S.off[oid].f === atk.fid) SG.S.off[oid].c = to; });
   });
 };
 // 패배한 공격군이 돌아감
@@ -539,9 +544,11 @@ SG.returnArmy = function (atk) {
   var home = SG.S.cities[atk.from].owner === atk.fid ? atk.from : SG.nearestOwn(atk.fid, atk.from);
   var n = SG.armyTotal(atk);
   atk.units.forEach(function (u) {
-    if (u.oid && SG.S.off[u.oid].s === 'force') {
-      if (home) SG.S.off[u.oid].c = home; else SG.makeFree(u.oid, atk.from);
-    }
+    [u.oid, u.dep].forEach(function (oid) {
+      if (oid && SG.S.off[oid].s === 'force' && SG.S.off[oid].f === atk.fid) {
+        if (home) SG.S.off[oid].c = home; else SG.makeFree(oid, atk.from);
+      }
+    });
   });
   if (home) SG.putTroops(SG.S.cities[home], SG.unitsMix(atk.units), home);
 };

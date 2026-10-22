@@ -380,6 +380,7 @@ SG.UI.tactical = function (atk, def) {
           h('div', null, [
             h('div', { class: 'bu-side', style: { color: fcol[u.side] }, text: (u.side === me ? '아군' : '적군') + ' · ' + fname[u.side] }),
             h('div', { class: 'bu-name' }, [u.name, h('span', { class: 'tag tt t-' + u.t, title: SG.TROOPS[u.t].desc, text: SG.TROOPS[u.t].h + ' ' + SG.TROOPS[u.t].n + (u.oid && SG.apt(u.oid) === u.t ? ' ★' : '') }), u.sk ? h('span', { class: 'tag sk', text: u.sk, title: SG.SKILLS[u.sk] }) : null]),
+            u.dep ? h('div', { class: 'bu-dep', title: '부장: 능력 ' + Math.round(SG.DEP_RATE * 100) + '%를 보태고, 주장이 잡히거나 죽으면 대신 부대를 이끕니다' }, [h('i', { text: '副' }), '부장 ' + SG.name(u.dep)]) : null,
             h('div', { class: 'note', text: SG.T.TERRAIN[tt].n + (u.conf > 0 ? ' · 혼란 중' : '') + (u.done ? ' · 행동 끝' : '') }),
             h('div', { class: 'bu-hp' }, [SG.UI.bar(u.n, u.max, u.side === me ? 'g' : 'r'), h('span', { text: SG.fmt(u.n) + ' / ' + SG.fmt(u.max) })])
           ])
@@ -432,7 +433,7 @@ SG.UI.tactical = function (atk, def) {
         B.units.filter(function (x) { return x.side === sd; }).forEach(function (x) {
           var row = h('button', { class: 'bu-row' + (x.n <= 0 ? ' gone' : '') + (st.sel === x ? ' on' : '') + (x.done && x.side === B.side && x.n > 0 ? ' done' : ''), type: 'button', disabled: x.n <= 0 || null, onclick: function () { if (x.n > 0) selectUnit(x); } }, [
             x.oid ? SG.UI.portrait(x.oid, 30, x.side === 'atk' ? atk.fid : def.fid) : h('span', { class: 'pt', style: { width: '30px', height: '30px', background: '#66706b', fontSize: '14px' } }, ['兵']),
-            h('span', { class: 'bu-rn' }, [h('i', { class: 'bu-t t-' + x.t, text: SG.TROOPS[x.t].h }), x.name]),
+            h('span', { class: 'bu-rn' }, [h('i', { class: 'bu-t t-' + x.t, text: SG.TROOPS[x.t].h }), x.name, x.dep ? h('i', { class: 'bu-rdep', title: '부장 ' + SG.name(x.dep), text: '副' }) : null]),
             SG.UI.bar(Math.max(0, x.n), Math.max(1, x.max), sd === me ? 'g' : 'r'),
             h('span', { class: 'bu-rv', text: x.n > 0 ? SG.fmt(x.n) : '궤멸' })
           ]);

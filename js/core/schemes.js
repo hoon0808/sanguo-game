@@ -146,6 +146,7 @@ SG.preBattle = function (atk, def) {
     delete S.off[u.oid].plot;
     if (!SG.chance(S.off[u.oid].loy >= 90 ? 0.4 : 0.85)) { pre.log.push(SG.name(u.oid) + '은(는) 마지막에 마음을 바꾸어 내응하지 않았다.'); return; }
     def.units.splice(def.units.indexOf(u), 1); atk.units.push(u); u.max = u.n;
+    if (u.dep) { if (SG._deps) delete SG._deps[u.oid]; u.dep = null; }   // 부장은 따라가지 않는다
     pre.turned.push({ oid: u.oid, to: 'atk' });
     pre.log.push('내응! ' + SG.name(u.oid) + '이(가) 약속대로 성문 안에서 들고일어나 ' + SG.forceName(atk.fid) + ' 쪽으로 돌아섰다!');
   });

@@ -1,4 +1,4 @@
-// 부장(副將): 출진할 때 부대마다 장수 한 명을 부장으로 붙인다.
+// 부장(副將): 출진할 때(그리고 우리 도시를 지킬 때) 부대마다 장수 한 명을 부장으로 붙인다.
 // 부장은 자기 통솔·무력·지력의 15%를 주장에게 보탠다 (100까지). 거느릴 수 있는 병사도 보탠 통솔로 계산한다.
 // 주장이 일기토에서 잡히거나 죽으면 부장이 지휘를 이어받아 부대가 흩어지지 않는다. 부대가 무너지면 부장도 잡힐 수 있다.
 var SG = SG || {};
@@ -68,14 +68,15 @@ SG.unitOids = function (u) { return [u.oid, u.oidLost, u.dep].filter(Boolean); }
 // 출진: 싸우는 동안 부장을 붙이고, 끝나면 뗀다. 부장도 이번 달 일을 한 것으로 친다
 SG._launchNoDep = SG.launchAttack;
 SG.launchAttack = async function (from, to, units) {
-  var mine = {};
+  var mine = {}, keep = {};
+  for (var k in SG._deps) keep[k] = SG._deps[k];
   (units || []).forEach(function (u) { if (u.oid && u.dep) { mine[u.oid] = u.dep; SG._deps[u.oid] = u.dep; } });
   try {
     var r = await SG._launchNoDep.apply(this, arguments);
     if (r && r.ok) Object.keys(mine).forEach(function (k) { var d = SG.S.off[mine[k]]; if (d) d.acted = true; });
     return r;
   } finally {
-    Object.keys(mine).forEach(function (k) { if (SG._deps[k] === mine[k]) delete SG._deps[k]; });
+    SG._deps = keep;   // 공격·수비 부장 모두 뗀다
   }
 };
 

@@ -173,6 +173,8 @@ SG.launchAttack = async function (from, to, units, supply) {
     var dset = await SG.ui.defenseSetup(atk, def);
     if (dset && dset.units) def.units = dset.units;
   }
+  // 수비 부장도 싸우는 동안 붙인다 (deputy.js 가 전투 뒤 뗀다)
+  if (SG._deps) def.units.forEach(function (u) { if (u.oid && u.dep) SG._deps[u.oid] = u.dep; });
   // 내응·매복 (계략으로 미리 꾸며 둔 일)
   var pre = SG.preBattle ? SG.preBattle(atk, def) : { log: [], turned: [] };
   atk.pre = pre;

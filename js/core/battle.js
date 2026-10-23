@@ -173,6 +173,8 @@ SG.launchAttack = async function (from, to, units, supply) {
     var dset = await SG.ui.defenseSetup(atk, def);
     if (dset && dset.units) def.units = dset.units;
   }
+  // 컴퓨터 수비는 약한 장수를 부장으로 돌린다
+  if (!SG.isPlayer(dfid) && SG.aiDefDeputies) SG.aiDefDeputies(def);
   // 수비 부장도 싸우는 동안 붙인다 (deputy.js 가 전투 뒤 뗀다)
   if (SG._deps) def.units.forEach(function (u) { if (u.oid && u.dep) SG._deps[u.oid] = u.dep; });
   // 내응·매복 (계략으로 미리 꾸며 둔 일)

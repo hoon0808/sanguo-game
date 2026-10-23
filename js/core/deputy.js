@@ -94,3 +94,30 @@ SG.aiDeputies = function (cid, plan, keep) {
   });
   return plan;
 };
+
+// 컴퓨터 수비: 약한 장수(통솔·무력 점수 50 미만)와 성에 나갈 자리(장수 8명)를 넘는 장수는 강한 부대의 부장이 된다.
+// 그 장수가 맡던 병사는 같은 병종의 여유 있는 부대에게, 그래도 남으면 장수 없는 수비병에게 간다
+SG.aiDefDeputies = function (def) {
+  function score(o) { var x = SG._oNoDep(o); return x.lead * 0.6 + x.war * 0.4; }
+  var offU = def.units.filter(function (u) { return u.oid; });
+  if (offU.length < 2) return def;
+  var byScore = offU.slice().sort(function (a, b) { return score(b.oid) - score(a.oid); });
+  var cands = byScore.filter(function (u, i) { return i > 0 && (i >= 8 || score(u.oid) < 50); }).reverse();   // 가장 약한 장수부터
+  cands.forEach(function (u) {
+    var boss = def.units.filter(function (m) { return m.oid && m !== u && !m.dep && m.n > 0 && cands.indexOf(m) < 0; })
+      .sort(function (a, b) { return b.n - a.n; })[0];
+    if (!boss) return;
+    var left = u.n, t = u.t;
+    def.units.splice(def.units.indexOf(u), 1);
+    boss.dep = u.oid;
+    def.units.filter(function (m) { return m.oid && m.t === t; }).forEach(function (m) {
+      var add = Math.min(left, SG.unitCap(m.oid, m.dep) - m.n);
+      if (add > 0) { m.n += add; m.max = m.n; left -= add; }
+    });
+    if (left > 0) {
+      var g = def.units.filter(function (m) { return !m.oid && m.t === t; })[0];
+      if (g) { g.n += left; g.max = g.n; } else def.units.push({ oid: null, n: left, max: left, t: t });
+    }
+  });
+  return def;
+};

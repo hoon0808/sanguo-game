@@ -78,19 +78,72 @@ SG.UI.tactical = function (atk, def) {
     var gBack = S2('g', { class: 'bt-back' }, svgEl);
     var backImg = S2('image', { href: 'img/terrain/' + TEX.plain + '.jpg', x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, gBack);
     var backShade = S2('rect', { x: 0, y: 0, width: W, height: H, class: 'bt-back-shade' }, gBack);
+    // 확대: 육각 칸을 크게 보이게 전장을 키우고(기본 1.35배), 끌어서 옮기거나 휠·＋－ 단추로 크기를 바꾼다. 세로 폰 화면은 예전처럼 옆으로 밀기만
+    var zoom = 1.35, vbNow = { x: 0, y: 0, w: W, h: H };
+    try { var zs = +localStorage.getItem('sg-bt-zoom'); if (zs >= 1 && zs <= 2.4) zoom = zs; } catch (e) {}
+    function zoomable() { return !(SG.UI.isPortrait && SG.UI.isPortrait()); }
     function fitField() {
       var vb = { x: 0, y: 0, w: W, h: H };
       var cw = stage.clientWidth, ch = stage.clientHeight;
-      if (!(SG.UI.isPortrait && SG.UI.isPortrait()) && cw > 50 && ch > 50) {
+      if (zoomable() && cw > 50 && ch > 50) {
         var A = cw / ch, a = W / H;
         if (A > a) { vb.w = H * A; vb.x = -(vb.w - W) / 2; } else { vb.h = W / A; vb.y = -(vb.h - H) / 2; }
-      }
+        svgEl.style.width = Math.round(cw * zoom) + 'px'; svgEl.style.height = Math.round(ch * zoom) + 'px';
+        stage.classList.toggle('zoomed', zoom > 1.001);
+      } else { svgEl.style.width = svgEl.style.height = ''; stage.classList.remove('zoomed'); }
+      vbNow = vb;
       svgEl.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);
       [backImg, backShade].forEach(function (el) { el.setAttribute('x', vb.x - 2); el.setAttribute('y', vb.y - 2); el.setAttribute('width', vb.w + 4); el.setAttribute('height', vb.h + 4); });
     }
-    var fitObs = window.ResizeObserver ? new ResizeObserver(fitField) : null;
+    // ax, ay: 확대의 중심 (전장 창 안의 화면 좌표). 그 점이 그대로 있게 스크롤을 맞춘다
+    function setZoom(z, ax, ay) {
+      z = Math.max(1, Math.min(2.4, z));
+      if (!zoomable() || Math.abs(z - zoom) < 0.001) return;
+      if (ax == null) { ax = stage.clientWidth / 2; ay = stage.clientHeight / 2; }
+      var k = z / zoom, sl = stage.scrollLeft, stp = stage.scrollTop;
+      zoom = z; fitField();
+      stage.scrollLeft = (sl + ax) * k - ax; stage.scrollTop = (stp + ay) * k - ay;
+      try { localStorage.setItem('sg-bt-zoom', String(Math.round(z * 100) / 100)); } catch (e) {}
+    }
+    var fitObs = window.ResizeObserver ? new ResizeObserver(function () { fitField(); }) : null;
     if (fitObs) fitObs.observe(stage); else window.addEventListener('resize', fitField);
     fitField();
+    // 처음 화면: 우리 부대들(공격이면 보급대 쪽, 수비면 성)이 가운데 오게
+    (function () {
+      var mine = B.units.filter(function (u) { return u.side === me && u.n > 0; }), cx = 0, cy = 0;
+      mine.forEach(function (u) { var p = SG.UI.hexXY(u.c, u.r); cx += p.x; cy += p.y; });
+      if (mine.length) { cx /= mine.length; cy /= mine.length; } else { cx = W / 2; cy = H / 2; }
+      var k = stage.scrollWidth / vbNow.w;
+      stage.scrollLeft = (cx - vbNow.x) * k - stage.clientWidth / 2; stage.scrollTop = (cy - vbNow.y) * k - stage.clientHeight / 2;
+    })();
+    // 휠로 확대·축소
+    stage.addEventListener('wheel', function (e) {
+      if (!zoomable()) return;
+      e.preventDefault();
+      var r = stage.getBoundingClientRect();
+      setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    // 마우스로 끌어서 옮기기 (조금이라도 끌었으면 그 뒤의 클릭은 무시)
+    var pan = null, panMoved = false;
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || !stage.classList.contains('zoomed')) return;
+      pan = { x: e.clientX, y: e.clientY, sl: stage.scrollLeft, st: stage.scrollTop }; panMoved = false;
+    });
+    function onPanMove(e) {
+      if (!pan) return;
+      var dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+      if (!panMoved && dx * dx + dy * dy > 36) { panMoved = true; stage.classList.add('panning'); }
+      if (panMoved) { stage.scrollLeft = pan.sl - dx; stage.scrollTop = pan.st - dy; }
+    }
+    function onPanUp() { pan = null; stage.classList.remove('panning'); setTimeout(function () { panMoved = false; }, 0); }
+    window.addEventListener('pointermove', onPanMove);
+    window.addEventListener('pointerup', onPanUp);
+    stage.addEventListener('click', function (e) { if (panMoved) { e.stopPropagation(); e.preventDefault(); } }, true);
+    field.appendChild(h('div', { class: 'bt-zoom' }, [
+      h('button', { type: 'button', title: '작게 (휠)', text: '−', onclick: function () { setZoom(zoom / 1.2); } }),
+      h('button', { type: 'button', title: '크게 (휠)', text: '＋', onclick: function () { setZoom(zoom * 1.2); } }),
+      h('button', { type: 'button', class: 'bz-fit', title: '전장 전체 보기', text: '전체', onclick: function () { setZoom(1); } })
+    ]));
     var gMap = S2('g', { class: 'bt-terrain' }, svgEl);
     var gDeco = S2('g', { class: 'bt-deco' }, svgEl);
     S2('rect', { x: 0, y: 0, width: W, height: H, filter: 'url(#bt-tex)', class: 'bt-grain' }, svgEl);
@@ -511,10 +564,14 @@ SG.UI.tactical = function (atk, def) {
     function redraw() { drawDepot(); drawHi(); drawUnits(); drawTop(); drawSide(); drawLog(); turnBanner(); }
 
     // 세로 화면에서는 전장이 옆으로 길어 넘치므로, 고른 부대가 보이게 옆으로 밀어 준다
+    // 확대했거나 세로 화면이면 전장이 창보다 커지므로, 고른(움직이는) 부대가 보이게 밀어 준다
     function reveal(u) {
-      if (!u || !SG.UI.isPortrait || !SG.UI.isPortrait()) return;
-      var k = svgEl.getBoundingClientRect().width / W, x = at(u).x * k;
-      if (x < stage.scrollLeft + 40 || x > stage.scrollLeft + stage.clientWidth - 40) stage.scrollTo({ left: x - stage.clientWidth / 2, behavior: 'smooth' });
+      if (!u || (stage.scrollWidth <= stage.clientWidth + 2 && stage.scrollHeight <= stage.clientHeight + 2)) return;
+      var rc = svgEl.getBoundingClientRect(), k = rc.width / vbNow.w, p = at(u);
+      var x = (p.x - vbNow.x) * k, y = (p.y - vbNow.y) * k, m = 90, to = {};
+      if (x < stage.scrollLeft + m || x > stage.scrollLeft + stage.clientWidth - m) to.left = x - stage.clientWidth / 2;
+      if (y < stage.scrollTop + m || y > stage.scrollTop + stage.clientHeight - m) to.top = y - stage.clientHeight / 2;
+      if (to.left != null || to.top != null) { to.behavior = 'smooth'; stage.scrollTo(to); }
     }
     function selectUnit(u) {
       st.sel = u; st.prev = null;
@@ -789,6 +846,7 @@ SG.UI.tactical = function (atk, def) {
         for (var i = 0; i < list.length && !B.over; i++) {
           var u = list[i];
           if (u.n <= 0 || u.done) continue;
+          if (!st.auto) reveal(u);
           var before = {};
           SG.T.alive(B).forEach(function (x) { before[x.id] = x.n; });
           var ev = SG.T.aiAct(B, u);
@@ -887,6 +945,7 @@ SG.UI.tactical = function (atk, def) {
       ]));
       await SG.UI.modal({ title: won ? '승리' : '패배', size: 'narrow', cancel: true, body: body });
       if (fitObs) fitObs.disconnect(); else window.removeEventListener('resize', fitField);
+      window.removeEventListener('pointermove', onPanMove); window.removeEventListener('pointerup', onPanUp);
       root.parentNode.removeChild(root);
       SG.UI.music('map');
       resolve(SG.T.result(B));

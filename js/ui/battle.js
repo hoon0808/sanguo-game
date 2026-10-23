@@ -74,6 +74,23 @@ SG.UI.tactical = function (atk, def) {
       var pt = S2('pattern', { id: 'tx-' + k, patternUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, defs);
       S2('image', { href: 'img/terrain/' + TEX[k] + '.jpg', x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, pt);
     });
+    // 전장 바깥 들판: 창 비율에 맞춰 보이는 범위(viewBox)를 넓히고, 넓어진 곳은 평지 그림으로 채워 여백이 없게 한다
+    var gBack = S2('g', { class: 'bt-back' }, svgEl);
+    var backImg = S2('image', { href: 'img/terrain/' + TEX.plain + '.jpg', x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' }, gBack);
+    var backShade = S2('rect', { x: 0, y: 0, width: W, height: H, class: 'bt-back-shade' }, gBack);
+    function fitField() {
+      var vb = { x: 0, y: 0, w: W, h: H };
+      var cw = stage.clientWidth, ch = stage.clientHeight;
+      if (!(SG.UI.isPortrait && SG.UI.isPortrait()) && cw > 50 && ch > 50) {
+        var A = cw / ch, a = W / H;
+        if (A > a) { vb.w = H * A; vb.x = -(vb.w - W) / 2; } else { vb.h = W / A; vb.y = -(vb.h - H) / 2; }
+      }
+      svgEl.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);
+      [backImg, backShade].forEach(function (el) { el.setAttribute('x', vb.x - 2); el.setAttribute('y', vb.y - 2); el.setAttribute('width', vb.w + 4); el.setAttribute('height', vb.h + 4); });
+    }
+    var fitObs = window.ResizeObserver ? new ResizeObserver(fitField) : null;
+    if (fitObs) fitObs.observe(stage); else window.addEventListener('resize', fitField);
+    fitField();
     var gMap = S2('g', { class: 'bt-terrain' }, svgEl);
     var gDeco = S2('g', { class: 'bt-deco' }, svgEl);
     S2('rect', { x: 0, y: 0, width: W, height: H, filter: 'url(#bt-tex)', class: 'bt-grain' }, svgEl);
@@ -869,6 +886,7 @@ SG.UI.tactical = function (atk, def) {
           (B.supply && !B.depotLost ? ' · 남은 군량 ' + SG.fmt(B.supply.food) + '·금 ' + SG.fmt(B.supply.gold.atk) + (B.over === 'atk' ? ' (차지한 도시로)' : ' (집으로)') : '') })
       ]));
       await SG.UI.modal({ title: won ? '승리' : '패배', size: 'narrow', cancel: true, body: body });
+      if (fitObs) fitObs.disconnect(); else window.removeEventListener('resize', fitField);
       root.parentNode.removeChild(root);
       SG.UI.music('map');
       resolve(SG.T.result(B));

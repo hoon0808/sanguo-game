@@ -26,25 +26,35 @@ SG.Audio = (function () {
   A.build = function (ctx) {
     var g = {};
     g.ctx = ctx;
+    // 마스터: 부드러운 압축 → 낮은 웅웅거림 걷기·가운데 탁함 덜기·위쪽 공기감 → 리미터
     g.comp = ctx.createDynamicsCompressor();
-    g.comp.threshold.value = -14; g.comp.ratio.value = 3; g.comp.attack.value = 0.01; g.comp.release.value = 0.25;
+    g.comp.threshold.value = -18; g.comp.knee.value = 12; g.comp.ratio.value = 2.2; g.comp.attack.value = 0.02; g.comp.release.value = 0.3;
+    g.hp = ctx.createBiquadFilter(); g.hp.type = 'highpass'; g.hp.frequency.value = 32;
+    g.mud = ctx.createBiquadFilter(); g.mud.type = 'peaking'; g.mud.frequency.value = 320; g.mud.Q.value = 0.9; g.mud.gain.value = -2.5;
+    g.air = ctx.createBiquadFilter(); g.air.type = 'highshelf'; g.air.frequency.value = 7500; g.air.gain.value = 2.5;
     g.master = ctx.createGain(); g.master.gain.value = 0.85;
     g.limit = ctx.createDynamicsCompressor();
     g.limit.threshold.value = -2; g.limit.knee.value = 0; g.limit.ratio.value = 20; g.limit.attack.value = 0.002; g.limit.release.value = 0.1;
-    g.comp.connect(g.master); g.master.connect(g.limit); g.limit.connect(ctx.destination);
+    g.comp.connect(g.hp); g.hp.connect(g.mud); g.mud.connect(g.air); g.air.connect(g.master); g.master.connect(g.limit); g.limit.connect(ctx.destination);
     g.musicBus = ctx.createGain(); g.sfxBus = ctx.createGain();
     g.musicBus.connect(g.comp); g.sfxBus.connect(g.comp);
-    // 잔향: 짧게 잦아드는 잡음으로 만든 공간감
+    // 잔향: 넓은 전각 같은 공간. 좌우가 다른 잡음이 천천히 잦아들고, 뒤로 갈수록 높은 소리가 먼저 사라진다 (+ 초반 반사음)
     g.verb = ctx.createConvolver();
-    var len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    var sr = ctx.sampleRate, len = Math.floor(sr * 3.6), pre = Math.floor(sr * 0.022), ir = ctx.createBuffer(2, len, sr);
     var r = rng(7);
     for (var ch = 0; ch < 2; ch++) {
-      var d = ir.getChannelData(ch);
-      for (var i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+      var d = ir.getChannelData(ch), lp = 0;
+      for (var i = pre; i < len; i++) {
+        var x = (i - pre) / (len - pre), a = 0.12 + 0.8 * x;   // 뒤로 갈수록 어둡게
+        lp += (r() * 2 - 1 - lp) * (1 - a);
+        d[i] = lp * Math.exp(-x * 5.2) * (1.4 + a);
+      }
+      [0.011, 0.019, 0.027, 0.041, 0.053, 0.067].forEach(function (s0, k) { var p = pre + Math.floor(sr * (s0 + ch * 0.0031 * (k + 1))); if (p < len) d[p] += (k % 2 ? -0.5 : 0.6) / (1 + k * 0.5); });
     }
     g.verb.buffer = ir;
-    g.verbIn = ctx.createGain(); g.verbIn.gain.value = 0.32;
-    g.verbIn.connect(g.verb); g.verb.connect(g.comp);
+    g.verbIn = ctx.createGain(); g.verbIn.gain.value = 0.34;
+    g.verbHp = ctx.createBiquadFilter(); g.verbHp.type = 'highpass'; g.verbHp.frequency.value = 220;
+    g.verbIn.connect(g.verbHp); g.verbHp.connect(g.verb); g.verb.connect(g.comp);
     g.pluckCache = {};
     return g;
   };
@@ -67,10 +77,15 @@ SG.Audio = (function () {
   };
 
   // ---- 악기
+  // PAN: 지금 연주하는 악기의 좌우 자리 (-1 왼쪽 ~ 1 오른쪽). playBar 가 악기마다 정한다
+  var PAN = 0;
   function out(g, bus, node, wet) {
-    node.connect(bus);
-    if (wet) { var s = g.ctx.createGain(); s.gain.value = wet; node.connect(s); s.connect(g.verbIn); }
+    var o = node;
+    if (PAN && g.ctx.createStereoPanner) { var pn = g.ctx.createStereoPanner(); pn.pan.value = PAN; node.connect(pn); o = pn; }
+    o.connect(bus);
+    if (wet) { var s = g.ctx.createGain(); s.gain.value = wet; o.connect(s); s.connect(g.verbIn); }
   }
+  function withPan(p, fn) { var keep = PAN; PAN = p; try { fn(); } finally { PAN = keep; } }
   // 고쟁: 카플러스-스트롱 방식으로 뜯는 현 소리를 미리 만들어 둔다
   function pluckBuffer(g, midi, bright) {
     var key = midi + (bright ? 'b' : '');
@@ -102,6 +117,7 @@ SG.Audio = (function () {
     var src = g.ctx.createBufferSource();
     src.buffer = pluckBuffer(g, midi, opt.bright);
     var gain = g.ctx.createGain();
+    vel *= 0.92 + Math.random() * 0.16;   // 손으로 뜯는 세기 차이
     gain.gain.setValueAtTime(vel * 0.5, t);
     if (opt.dur) gain.gain.setTargetAtTime(0, t + opt.dur, 0.08);
     // 고쟁 특유의 끝음 꺾기(살짝 올라갔다 돌아옴)
@@ -120,18 +136,18 @@ SG.Audio = (function () {
     o1.frequency.value = f; o2.frequency.value = f * 2;
     var vib = c.createOscillator(), vg = c.createGain();
     vib.frequency.value = 5.2; vg.gain.value = 0;
-    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.012, t + Math.min(0.6, dur * 0.6));
+    vg.gain.setValueAtTime(0, t); vg.gain.setValueAtTime(0, t + Math.min(0.25, dur * 0.3)); vg.gain.linearRampToValueAtTime(f * 0.011, t + Math.min(0.8, dur * 0.7));
     vib.connect(vg); vg.connect(o1.frequency); vg.connect(o2.frequency);
     var g2 = c.createGain(); g2.gain.value = 0.12;
     var amp = c.createGain();
     amp.gain.setValueAtTime(0, t);
-    amp.gain.linearRampToValueAtTime(vel * 0.32, t + 0.07);
-    amp.gain.setValueAtTime(vel * 0.3, t + Math.max(0.08, dur - 0.08));
+    amp.gain.linearRampToValueAtTime(vel * 0.32, t + 0.09);
+    amp.gain.linearRampToValueAtTime(vel * 0.27, t + Math.max(0.1, dur - 0.08));
     amp.gain.linearRampToValueAtTime(0, t + dur + 0.12);
     // 숨소리
     var nb = noiseBuffer(c), ns = c.createBufferSource(); ns.buffer = nb;
     var bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 2; bp.Q.value = 1.2;
-    var ng = c.createGain(); ng.gain.value = 0.05;
+    var ng = c.createGain(); ng.gain.value = 0.085;
     ns.connect(bp); bp.connect(ng); ng.connect(amp);
     o1.connect(amp); o2.connect(g2); g2.connect(amp);
     out(g, bus, amp, 0.5);
@@ -140,21 +156,25 @@ SG.Audio = (function () {
   // 이호: 톱니파를 몸통 공명처럼 걸러서, 활로 긋는 느낌
   A.erhu = function (g, bus, t, midi, dur, vel, slideFrom) {
     var c = g.ctx, f = mtof(midi);
-    var o = c.createOscillator(); o.type = 'sawtooth';
-    if (slideFrom) { o.frequency.setValueAtTime(mtof(slideFrom), t); o.frequency.exponentialRampToValueAtTime(f, t + 0.09); }
-    else o.frequency.setValueAtTime(f, t);
-    var vib = c.createOscillator(), vg = c.createGain(); vib.frequency.value = 6;
-    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.018, t + Math.min(0.5, dur * 0.7));
-    vib.connect(vg); vg.connect(o.frequency);
-    var b1 = c.createBiquadFilter(); b1.type = 'bandpass'; b1.frequency.value = 1100; b1.Q.value = 0.9;
-    var b2 = c.createBiquadFilter(); b2.type = 'peaking'; b2.frequency.value = 2600; b2.gain.value = 5;
-    var lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
+    var o = c.createOscillator(), o2 = c.createOscillator(); o.type = 'sawtooth'; o2.type = 'sawtooth'; o2.detune.value = 5;
+    [o, o2].forEach(function (x) {
+      if (slideFrom) { x.frequency.setValueAtTime(mtof(slideFrom), t); x.frequency.exponentialRampToValueAtTime(f, t + 0.11); }
+      else x.frequency.setValueAtTime(f, t);
+    });
+    var vib = c.createOscillator(), vg = c.createGain(); vib.frequency.value = 5.6;
+    vg.gain.setValueAtTime(0, t); vg.gain.setValueAtTime(0, t + Math.min(0.2, dur * 0.3)); vg.gain.linearRampToValueAtTime(f * 0.016, t + Math.min(0.7, dur * 0.8));
+    vib.connect(vg); vg.connect(o.frequency); vg.connect(o2.frequency);
+    var mix = c.createGain(); mix.gain.value = 0.6;
+    var b1 = c.createBiquadFilter(); b1.type = 'bandpass'; b1.frequency.value = 1050; b1.Q.value = 0.8;
+    var f1 = c.createBiquadFilter(); f1.type = 'peaking'; f1.frequency.value = 700; f1.Q.value = 2; f1.gain.value = 4;
+    var b2 = c.createBiquadFilter(); b2.type = 'peaking'; b2.frequency.value = 2500; b2.Q.value = 1.5; b2.gain.value = 4;
+    var lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4600;
     var amp = c.createGain();
-    amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel * 0.2, t + 0.08);
-    amp.gain.setValueAtTime(vel * 0.18, t + Math.max(0.1, dur - 0.06)); amp.gain.linearRampToValueAtTime(0, t + dur + 0.08);
-    o.connect(b1); b1.connect(b2); b2.connect(lp); lp.connect(amp);
-    out(g, bus, amp, 0.4);
-    o.start(t); vib.start(t); o.stop(t + dur + 0.15); vib.stop(t + dur + 0.15);
+    amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel * 0.19, t + 0.12);
+    amp.gain.linearRampToValueAtTime(vel * 0.17, t + Math.max(0.14, dur - 0.08)); amp.gain.linearRampToValueAtTime(0, t + dur + 0.12);
+    o.connect(mix); o2.connect(mix); mix.connect(b1); b1.connect(f1); f1.connect(b2); b2.connect(lp); lp.connect(amp);
+    out(g, bus, amp, 0.45);
+    [o, o2, vib].forEach(function (x) { x.start(t); x.stop(t + dur + 0.2); });
   };
   var _noise = null;
   function noiseBuffer(c) {
@@ -176,11 +196,13 @@ SG.Audio = (function () {
   }
   // 큰북 (전고)
   A.bigDrum = function (g, bus, t, vel) {
-    var c = g.ctx, o = c.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.35);
-    var a = c.createGain(); a.gain.setValueAtTime(vel * 0.9, t); a.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-    o.connect(a); out(g, bus, a, 0.25); o.start(t); o.stop(t + 1);
-    noise(g, bus, t, 0.12, 'lowpass', 900, 0, vel * 0.35, 0.2);
+    var c = g.ctx, o = c.createOscillator(), o2 = c.createOscillator(); o.type = 'sine'; o2.type = 'sine';
+    o.frequency.setValueAtTime(115, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.4);
+    o2.frequency.setValueAtTime(72, t); o2.frequency.exponentialRampToValueAtTime(36, t + 0.6);
+    var a = c.createGain(); a.gain.setValueAtTime(vel * 0.8, t); a.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+    var a2 = c.createGain(); a2.gain.setValueAtTime(vel * 0.45, t); a2.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+    o.connect(a); o2.connect(a2); out(g, bus, a, 0.35); out(g, bus, a2, 0.2); o.start(t); o2.start(t); o.stop(t + 1.2); o2.stop(t + 1.5);
+    noise(g, bus, t, 0.1, 'bandpass', 700, 1.1, vel * 0.4, 0.3);
   };
   A.smallDrum = function (g, bus, t, vel) {
     var c = g.ctx, o = c.createOscillator(); o.type = 'triangle';
@@ -235,6 +257,33 @@ SG.Audio = (function () {
     var a = c.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(vel * 0.3, t + 0.12);
     a.gain.setValueAtTime(vel * 0.26, t + Math.max(0.15, dur - 0.2)); a.gain.linearRampToValueAtTime(0, t + dur + 0.1);
     o.connect(lp); lp.connect(a); out(g, bus, a, 0.15); o.start(t); o.stop(t + dur + 0.2);
+  };
+  // 현악 화음 깔개: 살짝 어긋난 톱니파 셋을 부드럽게 걸러 천천히 부풀었다 잦아든다 (좌우로 펼침)
+  A.pad = function (g, bus, t, midis, dur, vel) {
+    var c = g.ctx;
+    midis.forEach(function (m, i) {
+      var f = mtof(m), lp = c.createBiquadFilter(), amp = c.createGain();
+      lp.type = 'lowpass'; lp.Q.value = 0.4;
+      lp.frequency.setValueAtTime(Math.min(900, f * 3), t); lp.frequency.linearRampToValueAtTime(Math.min(2200, f * 6), t + dur * 0.6);
+      amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel * 0.05, t + Math.min(1.2, dur * 0.45));
+      amp.gain.linearRampToValueAtTime(vel * 0.042, t + dur); amp.gain.linearRampToValueAtTime(0, t + dur + 1.4);
+      [-9, 0, 8].forEach(function (cents) {
+        var o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents + (Math.random() - 0.5) * 3;
+        o.connect(lp); o.start(t); o.stop(t + dur + 1.5);
+      });
+      lp.connect(amp);
+      withPan(midis.length > 1 ? -0.55 + 1.1 * i / (midis.length - 1) : 0, function () { out(g, bus, amp, 0.6); });
+    });
+  };
+  // 낮은 현 (첼로·콘트라베이스): 짧게 끊어 긋는 반주 (전투)
+  A.lowStr = function (g, bus, t, midi, dur, vel) {
+    var c = g.ctx, f = mtof(midi), o = c.createOscillator(), o2 = c.createOscillator();
+    o.type = 'sawtooth'; o2.type = 'sawtooth'; o.frequency.value = f; o2.frequency.value = f; o2.detune.value = -7;
+    var lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(1800, t); lp.frequency.exponentialRampToValueAtTime(500, t + dur);
+    var body = c.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 220; body.gain.value = 3;
+    var a = c.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(vel * 0.16, t + 0.015); a.gain.exponentialRampToValueAtTime(0.002, t + dur + 0.08);
+    o.connect(lp); o2.connect(lp); lp.connect(body); body.connect(a); out(g, bus, a, 0.25);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
   };
   // 비파 트레몰로: 같은 음을 잘게 빠르게 뜯기
   A.tremolo = function (g, bus, t, midi, dur, vel) {
@@ -360,21 +409,29 @@ SG.Audio = (function () {
     if (S.fadeIn) v *= 0.55 + 0.45 * k / S.bars;
     if (k === 0 && S.gong) A.gong(g, bus, t0, 0.7 * v, S.gong);
     if (k === 0 && S.crash) A.cymbal(g, bus, t0, 0.7 * v);
-    if (S.bells && k % 2 === 0) [0, 2, 4].forEach(function (x, i) { A.bell(g, bus, t0 + i * spb * 0.66, D(c + x + 5, 0), 0.5 * v); });
+    // 대목 안에서 서서히 부풀었다 가라앉는 셈여림
+    if (S.swell) v *= 0.82 + 0.3 * Math.sin(Math.PI * (k + 0.5) / S.bars);
+    // 악기마다 자리: 고쟁 왼쪽, 피리 오른쪽, 이호 가운데 조금 오른쪽, 종 넓게
+    if (S.bells && k % 2 === 0) [0, 2, 4].forEach(function (x, i) { withPan([-0.5, 0.1, 0.55][i], function () { A.bell(g, bus, t0 + i * spb * 0.66, D(c + x + 5, 0), 0.5 * v); }); });
     if (S.drone) A.bass(g, bus, t0, D(c, -1), spb * 3.9, 0.7 * v);
-    ACC[S.acc](g, bus, t0, spb, c, D, v);
-    PERC[S.perc || 'none'](g, bus, t0, spb, k, v);
-    if (S.hornCall && k % 4 === 2) A.horn(g, bus, t0, D(c, 0), spb * 2.5, 0.65 * v);
+    // 현악 화음: 근음·5도·10도로 넓게 벌린 화음
+    if (S.pad) A.pad(g, bus, t0, [D(c, -1), D(c + 3, -1), D(c + 7, -1)].concat(S.pad === 'full' ? [D(c + 4, 0)] : []), spb * 4, S.pad === 'soft' ? 0.6 * v : v);
+    // 낮은 현이 8분음표로 긋는다 (전투)
+    if (S.ost) for (var q = 0; q < 8; q++) A.lowStr(g, bus, t0 + q * spb * 0.5, D(c + (S.ost === 'run' && (q === 3 || q === 7) ? 1 : 0), -2) + (q % 4 === 2 ? 12 : 0), spb * 0.42, (q % 2 ? 0.55 : 0.85) * v);
+    withPan(-0.35, function () { ACC[S.acc](g, bus, t0, spb, c, D, v); });
+    withPan(0.05, function () { PERC[S.perc || 'none'](g, bus, t0, spb, k, v); });
+    if (S.hornCall && k % 4 === 2) withPan(-0.15, function () { A.horn(g, bus, t0, D(c, 0), spb * 2.5, 0.65 * v); });
     if (!S.lead) return;
     var prev = null, oct = S.oct === undefined ? 1 : S.oct;
-    phraseBar(S, k, r, tr.style.kind).forEach(function (n) {
-      var m = D(c + n.deg, oct);
-      LEAD[S.lead](g, bus, t0 + n.t * spb, m, n.d * spb, v, r, prev);
-      if (S.lead2) LEAD[S.lead2](g, bus, t0 + n.t * spb, m + (S.lead2 === 'xiao' ? 12 : 0), n.d * spb, 0.55 * v, r, prev);
+    var PANS = { flute: 0.32, xiao: 0.28, zheng: -0.3, erhu: 0.12, pipa: -0.2, horn: -0.1 };
+    phraseBar(S, k, r, tr.style.kind).forEach(function (n, i) {
+      var m = D(c + n.deg, oct), tj = (r() - 0.5) * 0.018, vj = v * (0.9 + r() * 0.18) * (i === 0 ? 1.06 : 1);   // 사람이 부는 듯 조금씩 어긋나게
+      withPan(PANS[S.lead] || 0, function () { LEAD[S.lead](g, bus, t0 + n.t * spb + tj, m, n.d * spb, vj, r, prev); });
+      if (S.lead2) withPan(PANS[S.lead2] || 0, function () { LEAD[S.lead2](g, bus, t0 + n.t * spb + tj * 1.7, m + (S.lead2 === 'xiao' ? 12 : 0), n.d * spb, 0.5 * vj, r, prev); });
       prev = m;
     });
     // 맞선율: 긴 음으로 화음을 받쳐 준다
-    if (S.counter) A.erhu(g, bus, t0, D(c + 2, 0), spb * 3.8, 0.38 * v);
+    if (S.counter) withPan(-0.2, function () { A.erhu(g, bus, t0, D(c + 2, 0), spb * 3.8, 0.34 * v); });
   }
 
   var TRACKS = {};
@@ -382,24 +439,24 @@ SG.Audio = (function () {
   TRACKS.title = { seed: 11, style: { kind: 'calm', bpm: 58, roots: [50, 48, 52, 45], modes: ['gong', 'zhi', 'yu'],
     form: function (r) {
       return [
-        { bars: 4, acc: 'roll', perc: 'grand', gong: 82, bells: true, drone: true },
-        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', drone: true },
-        { bars: 8, acc: lead(r, ['arp', 'tremolo']), perc: 'grand', lead: lead(r, ['erhu', 'xiao']), counter: true, gong: 70 },
-        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', lead2: 'zheng', bells: true },
-        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true }
+        { bars: 4, acc: 'roll', perc: 'grand', gong: 82, bells: true, drone: true, pad: 'soft' },
+        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', drone: true, pad: true, swell: true },
+        { bars: 8, acc: lead(r, ['arp', 'tremolo']), perc: 'grand', lead: lead(r, ['erhu', 'xiao']), counter: true, gong: 70, pad: 'full', swell: true },
+        { bars: 8, acc: 'roll', perc: 'grand', lead: 'flute', lead2: 'zheng', bells: true, pad: true, swell: true },
+        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true, pad: 'soft' }
       ];
     } } };
   // 전략 지도: 잔잔하게, 판마다 다른 노래
   TRACKS.map = { seed: 23, style: { kind: 'calm', bpm: 74, roots: [50, 52, 55, 57, 48], modes: ['gong', 'zhi', 'shang', 'yu'],
     form: function (r) {
       var f = [
-        { bars: 4, acc: 'roll', perc: 'none', bells: r() < 0.6, fadeIn: true },
-        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'wood', lead: lead(r, ['flute', 'zheng']) },
-        { bars: 8, acc: lead(r, ['arp', 'arp2', 'pulse']), perc: 'wood', lead: lead(r, ['zheng', 'flute', 'pipa']), counter: r() < 0.5 },
-        { bars: 8, acc: lead(r, ['pulse', 'tremolo']), perc: 'hand', lead: lead(r, ['erhu', 'xiao']), shift: lead(r, [5, 7, -5]) },
-        { bars: 8, acc: 'drone', perc: 'none', lead: lead(r, ['xiao', 'zheng']), mode: lead(r, ['yu', 'jue', 'shang']), oct: 1 },
-        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'hand', lead: 'flute', lead2: r() < 0.5 ? 'zheng' : null, counter: true },
-        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true }
+        { bars: 4, acc: 'roll', perc: 'none', bells: r() < 0.6, fadeIn: true, pad: 'soft' },
+        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'wood', lead: lead(r, ['flute', 'zheng']), pad: 'soft', swell: true },
+        { bars: 8, acc: lead(r, ['arp', 'arp2', 'pulse']), perc: 'wood', lead: lead(r, ['zheng', 'flute', 'pipa']), counter: r() < 0.5, pad: true, swell: true },
+        { bars: 8, acc: lead(r, ['pulse', 'tremolo']), perc: 'hand', lead: lead(r, ['erhu', 'xiao']), shift: lead(r, [5, 7, -5]), pad: true, swell: true },
+        { bars: 8, acc: 'drone', perc: 'none', lead: lead(r, ['xiao', 'zheng']), mode: lead(r, ['yu', 'jue', 'shang']), oct: 1, pad: 'full', swell: true },
+        { bars: 8, acc: lead(r, ['arp', 'arp2']), perc: 'hand', lead: 'flute', lead2: r() < 0.5 ? 'zheng' : null, counter: true, pad: true, swell: true },
+        { bars: 4, acc: 'sparse', perc: 'none', bells: true, fadeOut: true, pad: 'soft' }
       ];
       // 가운데 대목 순서를 섞는다
       if (r() < 0.5) { var x = f[3]; f[3] = f[4]; f[4] = x; }
@@ -409,12 +466,12 @@ SG.Audio = (function () {
   TRACKS.battle = { seed: 37, style: { kind: 'epic', bpm: 118, roots: [52, 50, 54, 55], modes: ['yu', 'shang', 'jue'],
     form: function (r) {
       return [
-        { bars: 2, acc: 'gallop', perc: 'roll', crash: true },
-        { bars: 8, acc: 'gallop', perc: lead(r, ['march', 'gallop']), lead: 'erhu', gong: 70 },
-        { bars: 8, acc: lead(r, ['gallop', 'pulse']), perc: 'gallop', lead: lead(r, ['flute', 'pipa']), oct: 1, hornCall: true, crash: true },
-        { bars: 4, acc: 'tremolo', perc: 'brk', lead: null, drone: true },
-        { bars: 8, acc: 'gallop', perc: 'march', lead: 'erhu', lead2: lead(r, ['flute', 'zheng']), shift: 2, crash: true },
-        { bars: 2, acc: 'gallop', perc: 'roll' }
+        { bars: 2, acc: 'gallop', perc: 'roll', crash: true, ost: true },
+        { bars: 8, acc: 'gallop', perc: lead(r, ['march', 'gallop']), lead: 'erhu', gong: 70, ost: true, pad: 'soft' },
+        { bars: 8, acc: lead(r, ['gallop', 'pulse']), perc: 'gallop', lead: lead(r, ['flute', 'pipa']), oct: 1, hornCall: true, crash: true, ost: 'run', pad: true },
+        { bars: 4, acc: 'tremolo', perc: 'brk', lead: null, drone: true, pad: 'full', swell: true },
+        { bars: 8, acc: 'gallop', perc: 'march', lead: 'erhu', lead2: lead(r, ['flute', 'zheng']), shift: 2, crash: true, ost: 'run', pad: 'full' },
+        { bars: 2, acc: 'gallop', perc: 'roll', ost: true }
       ];
     } } };
 

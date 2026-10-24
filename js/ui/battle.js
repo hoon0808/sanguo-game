@@ -2,6 +2,7 @@
 var SG = SG || {};
 
 SG.UI.HEX = 32; // 육각형 반지름(px)
+SG.UI.UNIT_SCALE = 1.4; // 부대 그림 크기 (칸에 견줘)
 
 SG.UI.hexXY = function (c, r) {
   var R = SG.UI.HEX;
@@ -248,20 +249,21 @@ SG.UI.tactical = function (atk, def) {
         var gd = S2('ellipse', { cx: 0, cy: rr - 4, rx: rr * 0.82, ry: 7, class: 'unit-ground' }, inner);
         gd.style.fill = fcol[u.side];
         if (st.sel === u) S2('circle', { r: rr + 4, class: 'unit-sel' }, inner);
-        var UA = { inf: 218 / 200, cav: 166 / 200, arc: 205 / 200 }, uw = u.t === 'cav' ? 64 : 56, uh = uw * (UA[u.t] || 1);
+        // 병종 그림은 칸보다 조금 크게 (위쪽으로 솟게) 그린다 (2026-10-24: 1.4배)
+        var UA = { inf: 218 / 200, cav: 166 / 200, arc: 205 / 200 }, uw = (u.t === 'cav' ? 64 : 56) * SG.UI.UNIT_SCALE, uh = uw * (UA[u.t] || 1);
         var face = u.side === 'atk' ? 1 : -1; // 공격군은 오른쪽(성 쪽), 수비군은 왼쪽을 본다
         var sg = S2('g', { transform: 'scale(' + face + ',1)' }, inner);
-        var spr = S2('image', { x: -uw / 2 + 2, y: rr + 1 - uh, width: uw, height: uh, class: 'unit-sprite' }, sg);
+        var spr = S2('image', { x: -uw / 2 + 2, y: rr + 3 - uh, width: uw, height: uh, class: 'unit-sprite' }, sg);
         spr.setAttribute('href', 'img/unit/' + (u.t || 'inf') + '.png');
         // 깃발 (깃대 + 성씨 한 글자)
-        var fx0 = rr - 6, fy0 = -rr - 14;
+        var fx0 = rr - 2, fy0 = Math.min(-rr - 14, rr + 3 - uh + 2);
         S2('path', { d: 'M' + fx0 + ',' + (fy0 - 2) + ' V' + (-4), class: 'pole' }, inner);
         var flag = S2('g', { class: 'banner', transform: 'translate(' + fx0 + ',' + fy0 + ')' }, inner);
         var fl = S2('path', { d: 'M0,0 h17 l-3,5 3,5 3,0 -3,5 3,5 h-20 Z', class: 'flag-cloth' }, flag);
         fl.style.fill = fcol[u.side];
         var ft = S2('text', { x: 8, y: 14, 'text-anchor': 'middle', class: 'flag-char' }, flag); ft.textContent = surname(u);
         // 장수 얼굴 (왼쪽 위 작은 원)
-        var fg = S2('g', { transform: 'translate(' + (-rr + 4) + ',' + (-rr + 2) + ')' }, inner);
+        var fg = S2('g', { transform: 'translate(' + (-rr + 1) + ',' + (-rr - 2) + ') scale(1.18)' }, inner);
         var fr = S2('circle', { r: 13, class: 'unit-face-ring' }, fg);
         fr.style.fill = fcol[u.side];
         if (u.oid) {

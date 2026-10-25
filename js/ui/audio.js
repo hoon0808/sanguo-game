@@ -285,6 +285,42 @@ SG.Audio = (function () {
     o.connect(lp); o2.connect(lp); lp.connect(body); body.connect(a); out(g, bus, a, 0.25);
     o.start(t); o2.start(t); o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
   };
+  // 합창 ('아―'): 떨림이 있는 톱니파를 목소리 울림(포먼트) 셋으로 걸러 천천히 부풀린다
+  A.choir = function (g, bus, t, midis, dur, vel) {
+    var c = g.ctx;
+    midis.forEach(function (m, i) {
+      var f = mtof(m), sum = c.createGain(), amp = c.createGain();
+      sum.gain.value = 0.5;
+      [[-6, 0.0], [5, 0.13]].forEach(function (p) {
+        var o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = p[0];
+        var vib = c.createOscillator(), vg = c.createGain(); vib.frequency.value = 4.6 + p[1] * 3; vg.gain.value = f * 0.007;
+        vib.connect(vg); vg.connect(o.frequency); o.connect(sum);
+        o.start(t); vib.start(t); o.stop(t + dur + 1.6); vib.stop(t + dur + 1.6);
+      });
+      [[750, 6, 1], [1150, 7, 0.55], [2600, 9, 0.25]].forEach(function (fm) {
+        var bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = fm[0]; bp.Q.value = fm[1];
+        var fg = c.createGain(); fg.gain.value = fm[2] * 2.6;
+        sum.connect(bp); bp.connect(fg); fg.connect(amp);
+      });
+      amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel * 0.09, t + Math.min(0.7, dur * 0.4));
+      amp.gain.linearRampToValueAtTime(vel * 0.075, t + dur); amp.gain.linearRampToValueAtTime(0, t + dur + 1.3);
+      withPan(midis.length > 1 ? -0.6 + 1.2 * i / (midis.length - 1) : 0, function () { out(g, bus, amp, 0.8); });
+    });
+  };
+  // 금관 (낮은 뿔나팔 무리): 겹친 톱니파가 어둡게 시작해 밝게 부풀었다 가라앉는다
+  A.brass = function (g, bus, t, midi, dur, vel) {
+    var c = g.ctx, f = mtof(midi), lp = c.createBiquadFilter(), amp = c.createGain();
+    lp.type = 'lowpass'; lp.Q.value = 1.2;
+    lp.frequency.setValueAtTime(260, t); lp.frequency.linearRampToValueAtTime(2000, t + 0.28); lp.frequency.linearRampToValueAtTime(1100, t + Math.max(0.4, dur));
+    amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel * 0.13, t + 0.12);
+    amp.gain.linearRampToValueAtTime(vel * 0.1, t + Math.max(0.2, dur - 0.15)); amp.gain.linearRampToValueAtTime(0, t + dur + 0.35);
+    [[1, -6], [1, 6], [0.5, 0], [2, 3]].forEach(function (p) {
+      var o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * p[0]; o.detune.value = p[1];
+      var og = c.createGain(); og.gain.value = p[0] === 2 ? 0.25 : p[0] === 0.5 ? 0.6 : 0.5;
+      o.connect(og); og.connect(lp); o.start(t); o.stop(t + dur + 0.4);
+    });
+    lp.connect(amp); out(g, bus, amp, 0.55);
+  };
   // 비파 트레몰로: 같은 음을 잘게 빠르게 뜯기
   A.tremolo = function (g, bus, t, midi, dur, vel) {
     var step = 0.085, n = Math.max(2, Math.floor(dur / step));
@@ -323,7 +359,7 @@ SG.Audio = (function () {
     var plan = st.form(r, cycle).map(function (sec) {
       var sr = sec.shift ? root + sec.shift : root, sm = sec.mode ? MODES[sec.mode] : MODES[mode];
       var p1 = pick(r, PROGS), p2 = pick(r, PROGS).slice(); p2[3] = 0;
-      return Object.assign({ root: sr, scale: sm, prog: p1.concat(p2), motif: makeMotif(r, st.kind), dyn: 0.9 }, sec);
+      return Object.assign({ root: sr, scale: sm, prog: p1.concat(p2), motif: makeMotif(r, st.kind), dyn: st.dyn || 0.9 }, sec);
     });
     return { bpm: bpm, plan: plan };
   }
@@ -373,7 +409,19 @@ SG.Audio = (function () {
       A.bigDrum(g, b, t, 0.7 * v);
       for (var i = 0; i < 16; i++) A.smallDrum(g, b, t + i * spb * 0.25, (0.12 + i * 0.022) * v);
     },
-    brk: function (g, b, t, spb, k, v) { A.bigDrum(g, b, t, 0.75 * v); if (k % 2 === 1) A.bigDrum(g, b, t + 3 * spb, 0.5 * v); }
+    brk: function (g, b, t, spb, k, v) { A.bigDrum(g, b, t, 0.75 * v); if (k % 2 === 1) A.bigDrum(g, b, t + 3 * spb, 0.5 * v); },
+    // 큰북 여러 대가 함께 치는 장단 (살짝 어긋나게 겹쳐 두께를 낸다)
+    epic: function (g, b, t, spb, k, v) {
+      function hit(x, s) { withPan(-0.3, function () { A.bigDrum(g, b, t + x * spb, s * v); }); withPan(0.3, function () { A.bigDrum(g, b, t + x * spb + 0.012, s * 0.85 * v); }); }
+      var pat = k % 4 === 3 ? [[0, 1], [1, 0.6], [1.5, 0.55], [2, 0.9], [2.5, 0.6], [3, 0.7], [3.25, 0.6], [3.5, 0.75], [3.75, 0.85]] : k % 2 ? [[0, 1], [0.75, 0.5], [1.5, 0.7], [2, 0.95], [3, 0.6], [3.5, 0.55]] : [[0, 1], [1.5, 0.65], [2, 0.9], [3, 0.55]];
+      pat.forEach(function (p) { hit(p[0], p[1]); });
+      for (var i = 0; i < 4; i++) A.smallDrum(g, b, t + (i + 0.5) * spb, 0.2 * v);
+    },
+    half: function (g, b, t, spb, k, v) {   // 반박자로 느리고 무겁게
+      withPan(-0.25, function () { A.bigDrum(g, b, t, 1.0 * v); }); withPan(0.25, function () { A.bigDrum(g, b, t + 0.015, 0.8 * v); });
+      A.bigDrum(g, b, t + 2 * spb, 0.85 * v);
+      if (k % 2) A.bigDrum(g, b, t + 3.5 * spb, 0.6 * v);
+    }
   };
   // 선율 한 마디: 동기(2마디)를 내놓고 → 받고 → 한 칸 옮겨 되풀이 → 마침. 뒷 4마디는 꾸밈을 더한다
   function phraseBar(S, k, r, kind) {
@@ -416,6 +464,10 @@ SG.Audio = (function () {
     if (S.drone) A.bass(g, bus, t0, D(c, -1), spb * 3.9, 0.7 * v);
     // 현악 화음: 근음·5도·10도로 넓게 벌린 화음
     if (S.pad) A.pad(g, bus, t0, [D(c, -1), D(c + 3, -1), D(c + 7, -1)].concat(S.pad === 'full' ? [D(c + 4, 0)] : []), spb * 4, S.pad === 'soft' ? 0.6 * v : v);
+    // 합창: 근음·5도·위 3도 (위로 갈수록 여리게)
+    if (S.choir) A.choir(g, bus, t0, [D(c, 0), D(c + 3, 0), D(c + 2, 1)], spb * 4, (S.choir === 'big' ? 1.15 : 0.85) * v);
+    // 금관: 두 마디마다 근음·5도를 길게
+    if (S.brass && k % 2 === 0) withPan(-0.1, function () { A.brass(g, bus, t0, D(c, -1), spb * 7.6, v); A.brass(g, bus, t0 + 0.02, D(c + 3, -1), spb * 7.6, 0.8 * v); });
     // 낮은 현이 8분음표로 긋는다 (전투)
     if (S.ost) for (var q = 0; q < 8; q++) A.lowStr(g, bus, t0 + q * spb * 0.5, D(c + (S.ost === 'run' && (q === 3 || q === 7) ? 1 : 0), -2) + (q % 4 === 2 ? 12 : 0), spb * 0.42, (q % 2 ? 0.55 : 0.85) * v);
     withPan(-0.35, function () { ACC[S.acc](g, bus, t0, spb, c, D, v); });
@@ -463,15 +515,28 @@ SG.Audio = (function () {
       return f;
     } } };
   // 전투: 빠르고 긴장감 있게, 판마다 한 음씩 올라가며 고조
-  TRACKS.battle = { seed: 37, style: { kind: 'epic', bpm: 118, roots: [52, 50, 54, 55], modes: ['yu', 'shang', 'jue'],
+  TRACKS.battle = { seed: 37, style: { kind: 'epic', dyn: 0.72, bpm: 118, roots: [52, 50, 54, 55], modes: ['yu', 'shang', 'jue'],
     form: function (r) {
       return [
-        { bars: 2, acc: 'gallop', perc: 'roll', crash: true, ost: true },
-        { bars: 8, acc: 'gallop', perc: lead(r, ['march', 'gallop']), lead: 'erhu', gong: 70, ost: true, pad: 'soft' },
-        { bars: 8, acc: lead(r, ['gallop', 'pulse']), perc: 'gallop', lead: lead(r, ['flute', 'pipa']), oct: 1, hornCall: true, crash: true, ost: 'run', pad: true },
-        { bars: 4, acc: 'tremolo', perc: 'brk', lead: null, drone: true, pad: 'full', swell: true },
-        { bars: 8, acc: 'gallop', perc: 'march', lead: 'erhu', lead2: lead(r, ['flute', 'zheng']), shift: 2, crash: true, ost: 'run', pad: 'full' },
-        { bars: 2, acc: 'gallop', perc: 'roll', ost: true }
+        { bars: 4, acc: 'drone', perc: 'half', gong: 62, crash: true, brass: true, choir: true, swell: true },
+        { bars: 8, acc: 'gallop', perc: 'epic', lead: 'erhu', gong: 70, ost: true, pad: 'soft', brass: true },
+        { bars: 8, acc: lead(r, ['gallop', 'pulse']), perc: 'epic', lead: lead(r, ['flute', 'pipa']), oct: 1, hornCall: true, crash: true, ost: 'run', pad: true, choir: true },
+        { bars: 4, acc: 'tremolo', perc: 'half', lead: null, drone: true, pad: 'full', brass: true, choir: 'big', swell: true },
+        { bars: 8, acc: 'gallop', perc: 'epic', lead: 'erhu', lead2: lead(r, ['flute', 'zheng']), shift: 2, crash: true, ost: 'run', pad: 'full', brass: true, choir: 'big' },
+        { bars: 2, acc: 'gallop', perc: 'roll', ost: true, brass: true }
+      ];
+    } } };
+
+  // 엔딩: 천하통일 뒤 엔딩 크레딧. 느리고 넓게, 합창과 금관으로 끝을 맺는다
+  TRACKS.ending = { seed: 53, style: { kind: 'calm', bpm: 60, roots: [50, 48, 52], modes: ['gong', 'zhi'],
+    form: function (r) {
+      return [
+        { bars: 4, acc: 'sparse', perc: 'none', bells: true, pad: 'soft', fadeIn: true, gong: 82 },
+        { bars: 8, acc: 'roll', perc: 'none', lead: 'flute', pad: true, swell: true },
+        { bars: 8, acc: 'arp', perc: 'grand', lead: 'erhu', counter: true, pad: 'full', choir: true, swell: true },
+        { bars: 8, acc: 'roll', perc: 'grand', lead: 'xiao', lead2: 'zheng', pad: 'full', brass: true, choir: 'big', gong: 70, swell: true },
+        { bars: 8, acc: 'tremolo', perc: 'half', lead: 'flute', pad: 'full', brass: true, choir: 'big', swell: true },
+        { bars: 6, acc: 'sparse', perc: 'none', bells: true, pad: 'soft', choir: true, fadeOut: true }
       ];
     } } };
 
@@ -528,7 +593,7 @@ SG.Audio = (function () {
 
   // ---- 배경음악: 미리 녹음한 파일(music/*.mp3)을 <audio> 로 튼다 (tools/render-music.js 로 만듦)
   // 화면이 바빠도 브라우저가 따로 재생하므로 끊기지 않는다. 곡마다 여러 판을 차례로 이어 튼다.
-  A.FILES = { title: ['title-1'], map: ['map-1', 'map-2', 'map-3'], battle: ['battle-1', 'battle-2'] };
+  A.FILES = { title: ['title-1'], map: ['map-1', 'map-2', 'map-3'], battle: ['battle-1', 'battle-2'], ending: ['ending-1'] };
   A.turn = {};
   A.els = [];
   function musicVolume() { return A.settings.music ? Math.min(1, A.settings.musicVol / 0.7) : 0; }

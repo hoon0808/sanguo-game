@@ -1784,3 +1784,36 @@ html.portrait .bt-zoom { display: none; }
 .cr-end { font-family: var(--f-display); font-size: 120px; line-height: 1; color: #f1d79a; margin: 20px 0 18px; text-shadow: 0 0 40px rgba(233, 196, 106, .4); }
 .cr-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 0 18px; }
 html.compact .cr-open h1 { font-size: 48px; } html.compact .cr-sec { padding: 44px 0; } html.compact .cr-end { font-size: 84px; }
+/* 엔딩 화면: 그림 장면을 한 장씩 */
+.ending-screen { background: #0d0a06; }
+.ed-stage { position: absolute; inset: 0 0 64px; }
+.ed-scene { position: absolute; inset: 0; background: center / cover no-repeat; animation: edIn 1.4s ease-out both; }
+.ed-scene.out { animation: edOut .9s ease-in both; }
+@keyframes edIn { from { opacity: 0; transform: scale(1.04); } }
+@keyframes edOut { to { opacity: 0; } }
+.ed-shade { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, rgba(10, 7, 3, .45), rgba(10, 7, 3, .86) 75%); }
+.ed-scene.last .ed-shade { background: rgba(10, 7, 3, .82); }
+.ed-body { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; }
+.ed-scene.last .ed-body { display: block; overflow-y: auto; padding: 40px 16px 60px; }
+.ed-body > * { animation: inkIn 1.6s ease-out both .5s; }
+.ed-open h1 { font-family: var(--f-display); font-weight: 400; font-size: 80px; letter-spacing: .16em; margin: 16px 0 6px; color: #f6e4b0; text-shadow: 0 3px 24px rgba(0, 0, 0, .7); }
+.ed-open .pt, .ed-role .pt { margin: 14px auto 0; box-shadow: 0 0 0 3px #c9a24a, 0 0 36px rgba(233, 196, 106, .45); }
+.ed-open .cr-lead { white-space: pre-line; }
+.ed-story { max-width: 760px; }
+.ed-story p { font-family: var(--f-display); font-size: 26px; line-height: 1.9; white-space: pre-line; margin: 0 0 22px; text-shadow: 0 2px 14px rgba(0, 0, 0, .8); }
+.ed-story p + p { animation-delay: 2.2s; }
+.ed-role { display: flex; align-items: center; gap: 40px; max-width: 900px; text-align: left; }
+.ed-role .pt { margin: 0; flex: none; }
+.ed-han { font-family: var(--f-display); font-size: 54px; color: #e7c873; letter-spacing: .12em; line-height: 1.1; }
+.ed-role h2 { font-family: var(--f-display); font-weight: 400; font-size: 30px; margin: 6px 0 14px; }
+.ed-role p { font-size: 20px; line-height: 1.8; margin: 0; text-shadow: 0 2px 12px rgba(0, 0, 0, .8); }
+.ed-last { width: min(820px, 100%); margin: 0 auto; text-align: center; }
+.ed-last h2 { font-family: var(--f-display); font-weight: 400; font-size: 28px; letter-spacing: .14em; color: #e7c873; margin: 34px 0 18px; }
+.ed-last h2:first-child { margin-top: 0; }
+.ed-rec { max-width: 480px; margin: 0 auto; }
+.ed-dots { display: flex; gap: 6px; margin-right: auto; padding-left: 4px; }
+.ed-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(244, 234, 210, .28); }
+.ed-dots i.on { background: #e7c873; }
+html.compact .ed-open h1 { font-size: 50px; } html.compact .ed-story p { font-size: 18px; } html.compact .ed-han { font-size: 36px; }
+html.compact .ed-role { gap: 18px; } html.compact .ed-role .pt { width: 110px !important; height: 110px !important; } html.compact .ed-role p { font-size: 15px; }
+html.portrait .ed-role { flex-direction: column; text-align: center; }

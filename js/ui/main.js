@@ -310,6 +310,8 @@ SG.UI.afterAction = function () {
   if (SG.UI._endShown) return;
   SG.UI._endShown = true;
   var win = S.over === 'win', f = S.forces[S.player], lord = f.lord;
+  // 천하통일: 창 없이 바로 엔딩 화면으로 (js/ui/credits.js)
+  if (win && SG.UI.ending) { SG.UI.ending().then(function () { SG.UI._endShown = false; SG.UI.title(); }); return; }
   SG.UI.sfx(win ? 'win' : 'lose');
   var t = SG.forceTotals(S.player), sc = SG.SCENARIOS.filter(function (x) { return x.id === S.scen; })[0];
   function stat(k, v) { return h('div', { class: 'end-stat' }, [h('b', { text: v }), h('span', { text: k })]); }
@@ -323,13 +325,8 @@ SG.UI.afterAction = function () {
       h('div', { class: 'end-stats' }, [stat('개월', S.turnCount), stat('도시', win ? SG.CITY_LIST.length : t.cities), stat('장수', t.officers), stat('병사', SG.fmt(t.soldiers))])
     ])
   ]);
-  // 천하통일이면 엔딩 크레딧 (공신록·후일담·만든 사람들)
-  SG.UI.modal({ title: win ? '축하합니다!' : '게임 종료', size: 'wide', tone: win ? 'gold' : 'war', icon: win ? 'star' : 'flag', body: body,
-    buttons: win ? [{ label: '타이틀로', value: 'title' }, { label: '엔딩 크레딧', value: 'credits', cls: 'primary' }] : [{ label: '타이틀로', value: true, cls: 'primary' }] })
-    .then(async function (v) {
-      if (win && v === 'credits' && SG.UI.credits) await SG.UI.credits();
-      SG.UI._endShown = false; SG.UI.title();
-    });
+  SG.UI.modal({ title: win ? '축하합니다!' : '게임 종료', size: 'wide', tone: win ? 'gold' : 'war', icon: win ? 'star' : 'flag', body: body, buttons: [{ label: '타이틀로', value: true, cls: 'primary' }] })
+    .then(function () { SG.UI._endShown = false; SG.UI.title(); });
 };
 
 // 전투 양군 비교 (전투 시작 창·자동 전투 결과 창). after 면 남은 병사/처음 병사 막대

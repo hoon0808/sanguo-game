@@ -372,7 +372,3 @@ html.portrait .hall .visitor.body.b-warrior, html.portrait .hall .visitor.body.b
 html.portrait .hall .visitor.body.b-scholar, html.portrait .hall .visitor.body.b-lady { height: 280px; }
 html.portrait .hall .visitor.body .v-side { left: -96px; }
 html.portrait .hall .host.body { height: 200px; right: 2%; }
-/* 전장 확대 (가로 폰): 손가락으로 밀어 옮긴다 */
-html.compact .bt-stage.zoomed { overflow: auto; -webkit-overflow-scrolling: touch; padding: 0; }
-html.compact .bt-zoom { right: 6px; bottom: 6px; }
-html.compact .bt-zoom button { min-width: 30px; height: 30px; font-size: 16px; }

@@ -1745,15 +1745,6 @@ html:not(.compact) .bt-stage { padding: 0; }
 /* 전장 바깥 들판 (싸울 수 없는 곳): 조금 어둡게 */
 .bt-back-shade { fill: rgba(28, 22, 10, .38); pointer-events: none; }
 .bt-back image { pointer-events: none; }
-/* 전장 확대: 창보다 커지면 왼쪽 위부터 그리고 끌어서 옮긴다 */
-.bt-stage.zoomed { display: block; place-items: normal; overflow: auto; scrollbar-width: thin; text-align: left; }
-.bt-stage.zoomed > .bt-svg { display: block !important; margin: 0; cursor: grab; }
-.bt-stage.panning, .bt-stage.panning * { cursor: grabbing !important; }
-.bt-zoom { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 4px; }
-.bt-zoom button { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid rgba(255, 240, 200, .45); border-radius: 6px; background: rgba(28, 22, 12, .72); color: #fbf2da; font: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
-.bt-zoom button.bz-fit { font-size: 13px; }
-.bt-zoom button:hover { background: rgba(60, 46, 20, .85); }
-html.portrait .bt-zoom { display: none; }
 /* 엔딩 크레딧 */
 .credits { position: fixed; inset: 0; z-index: 200; background: #120e08 center / cover no-repeat; color: #f4ead2; overflow: hidden; animation: crIn 1.2s ease-out both; }
 .credits.out { opacity: 0; transition: opacity .5s; }

@@ -528,15 +528,16 @@ SG.Audio = (function () {
     } } };
 
   // 엔딩: 천하통일 뒤 엔딩 크레딧. 느리고 넓게, 합창과 금관으로 끝을 맺는다
-  TRACKS.ending = { seed: 53, style: { kind: 'calm', bpm: 60, roots: [50, 48, 52], modes: ['gong', 'zhi'],
+  // 엔딩: 천하통일을 축하하는 밝고 힘찬 곡 (2026-10-26 바꿈 — 처음 곡은 느리고 잔잔했음).
+  // 금관·합창의 팡파르로 열고 → 피리·고쟁의 행진 → 이호의 노래 → 한 음 올려 큰북·금관 절정 → 잔잔히 맺음
+  TRACKS.ending = { seed: 71, style: { kind: 'epic', dyn: 0.8, bpm: 92, roots: [55, 53, 50], modes: ['gong', 'zhi'],
     form: function (r) {
       return [
-        { bars: 4, acc: 'sparse', perc: 'none', bells: true, pad: 'soft', fadeIn: true, gong: 82 },
-        { bars: 8, acc: 'roll', perc: 'none', lead: 'flute', pad: true, swell: true },
-        { bars: 8, acc: 'arp', perc: 'grand', lead: 'erhu', counter: true, pad: 'full', choir: true, swell: true },
-        { bars: 8, acc: 'roll', perc: 'grand', lead: 'xiao', lead2: 'zheng', pad: 'full', brass: true, choir: 'big', gong: 70, swell: true },
-        { bars: 8, acc: 'tremolo', perc: 'half', lead: 'flute', pad: 'full', brass: true, choir: 'big', swell: true },
-        { bars: 6, acc: 'sparse', perc: 'none', bells: true, pad: 'soft', choir: true, fadeOut: true }
+        { bars: 2, acc: 'drone', perc: 'half', gong: 78, crash: true, brass: true, choir: 'big', bells: true },
+        { bars: 8, acc: 'pulse', perc: 'march', lead: 'flute', lead2: 'zheng', pad: true, brass: true, bells: true, swell: true },
+        { bars: 8, acc: 'arp', perc: 'hand', lead: 'erhu', counter: true, pad: 'full', choir: true, swell: true },
+        { bars: 8, acc: 'gallop', perc: 'epic', lead: 'flute', lead2: 'pipa', oct: 1, hornCall: true, brass: true, choir: 'big', crash: true, shift: 2, pad: 'full' },
+        { bars: 6, acc: 'roll', perc: 'grand', lead: 'xiao', pad: 'full', choir: true, bells: true, gong: 82, fadeOut: true }
       ];
     } } };
 

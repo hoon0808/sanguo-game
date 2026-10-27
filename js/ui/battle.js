@@ -63,10 +63,6 @@ SG.UI.tactical = function (atk, def) {
     var defs = S2('defs', {}, svgEl);
     S2('circle', { r: R - 10 }, S2('clipPath', { id: 'clip-me' }, defs));
     S2('circle', { r: 11.5 }, S2('clipPath', { id: 'clip-face' }, defs));
-    // 종이·흙 결 (지형 위에 살짝 덮는다)
-    var tex = S2('filter', { id: 'bt-tex', x: 0, y: 0, width: '100%', height: '100%' }, defs);
-    S2('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.035', numOctaves: 3, seed: 7, result: 'n' }, tex);
-    S2('feColorMatrix', { type: 'matrix', values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0', in: 'n' }, tex);
     var glow = S2('filter', { id: 'bt-glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
     S2('feGaussianBlur', { stdDeviation: 3 }, glow);
     // 지형 그림 (Higgsfield 로 그린 위에서 본 바탕). 전장 크기만 한 무늬라 이음매가 없다
@@ -102,7 +98,8 @@ SG.UI.tactical = function (atk, def) {
     fitField();
     var gMap = S2('g', { class: 'bt-terrain' }, svgEl);
     var gDeco = S2('g', { class: 'bt-deco' }, svgEl);
-    S2('rect', { x: 0, y: 0, width: W, height: H, filter: 'url(#bt-tex)', class: 'bt-grain' }, svgEl);
+    // 예전엔 잡음 필터(feTurbulence)로 결을 냈으나 부대가 움직일 때마다 다시 계산돼 무거웠다 → 옅은 갈색 한 겹만 (2026-10-27)
+    S2('rect', { x: 0, y: 0, width: W, height: H, class: 'bt-grain' }, svgEl);
     var gDepot = S2('g', { class: 'bt-depot' }, svgEl), gHi = S2('g', {}, svgEl), gUnits = S2('g', {}, svgEl), gFx = S2('g', {}, svgEl);
     // 공격군 보급대 (粮): 수비군이 이 칸에 들어오면 공격군이 진다
     function drawDepot() {
@@ -731,6 +728,7 @@ SG.UI.tactical = function (atk, def) {
             h('button', { class: 'btn primary', text: '확인', onclick: closeIt })
           ]));
           root.appendChild(ov);
+          if (st.auto) setTimeout(closeIt, 1600);   // 맡겨 둔 싸움은 멈추지 않고 넘어간다
           return;
         }
         SG.UI.sfx('duel');
@@ -771,6 +769,7 @@ SG.UI.tactical = function (atk, def) {
           SG.UI.sfx(aWins === (a.side === me) ? 'win' : 'lose');
           skip.textContent = '확인'; skip.classList.add('primary');
           skip.onclick = closeIt;
+          if (st.auto) setTimeout(closeIt, 1800);
         }
         skip.onclick = ending;
         timer = setInterval(function () {
@@ -797,7 +796,7 @@ SG.UI.tactical = function (atk, def) {
       st.anim = true;
       while (!B.over && (B.side !== me || st.auto)) {
         redraw();
-        await SG.UI.sleep(st.auto ? 120 : 450);
+        await SG.UI.sleep(st.auto ? 120 : 350);
         var list = SG.T.alive(B, B.side).filter(function (u) { return !u.done; });
         list.sort(function (a, b) { return SG.T.dist([a.c, a.r], [SG.T.CASTLE.c, SG.T.CASTLE.r]) - SG.T.dist([b.c, b.r], [SG.T.CASTLE.c, SG.T.CASTLE.r]); });
         for (var i = 0; i < list.length && !B.over; i++) {
@@ -834,7 +833,7 @@ SG.UI.tactical = function (atk, def) {
           });
           st.sel = u;
           redraw();
-          await SG.UI.sleep(st.auto ? 110 : 520);
+          await SG.UI.sleep(st.auto ? 110 : 400);
           st.flash = {};
         }
         st.sel = null;

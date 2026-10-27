@@ -509,7 +509,7 @@ table.t tr.dim td { opacity: .45; }
 .unit-badge.me { fill: var(--surface); } .unit-badge.foe { fill: var(--surface); }
 .unit-num { fill: var(--ink); font-size: 10px; font-weight: 700; stroke: none; font-variant-numeric: tabular-nums; }
 .unit-conf { fill: var(--seal); font-family: var(--f-display); font-size: 15px; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
-.unit-sel { fill: none; stroke: var(--bronze); stroke-width: 3; animation: pulse 1.1s ease-in-out 3; }
+.unit-sel { fill: none; stroke: var(--bronze); stroke-width: 3; }
 @keyframes pulse { 50% { stroke-opacity: .35; } }
 .unit.lunge { animation: lunge .4s ease-out; }
 @keyframes lunge { 40% { transform: translate(var(--lx), var(--ly)); } }
@@ -644,7 +644,7 @@ table.t tr.dim td { opacity: .45; }
   animation: fog 40s linear infinite alternate; }
 @keyframes fog { to { transform: translate(6%, -4%); } }
 .bt-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,.45) 100%); }
-.bt-grain { pointer-events: none; mix-blend-mode: multiply; opacity: .28; }
+.bt-grain { pointer-events: none; fill: rgb(70, 52, 24); opacity: .09; }
 .hex { stroke: rgba(40,35,20,.18); stroke-width: 1; }
 .hex-tone { pointer-events: none; }
 .hex-tone.lt { fill: #fff; opacity: .07; } .hex-tone.dk { fill: #000; opacity: .06; }
@@ -671,7 +671,8 @@ table.t tr.dim td { opacity: .45; }
 
 /* 부대 깃발 */
 .pole { stroke: #3a2c1c; stroke-width: 1.6; }
-.banner { animation: wave-flag 2.2s ease-in-out 2; transform-box: fill-box; transform-origin: left center; }
+/* 깃발 흔들림은 뺐다: 부대를 다시 그릴 때마다 흔들림이 처음부터 다시 돌아 전장 전체를 계속 새로 그리게 했다 (2026-10-27 느려짐 원인) */
+.banner { transform-box: fill-box; transform-origin: left center; }
 @keyframes wave-flag { 50% { transform: skewY(-6deg) scaleX(.94); } }
 .flag-cloth { stroke: rgba(0,0,0,.45); stroke-width: 1; }
 .flag-char { font-family: var(--f-display); font-size: 12px; fill: #fff; }

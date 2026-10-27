@@ -632,7 +632,7 @@ table.t tr.dim td { opacity: .45; }
 .li-meta span { font-size: 12px; color: var(--muted); }
 
 /* ===================== 전투 화면 (화려하게) ===================== */
-.bt { grid-template-rows: 60px 1fr 120px; grid-template-columns: 1fr 340px; }
+.bt { grid-template-rows: 60px 1fr 104px; grid-template-columns: 1fr 312px; }
 .bt .field-area { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 45%, #6f7a5a, #2c3226 75%); }
 :root[data-theme="dark"] .bt .field-area { background: radial-gradient(ellipse at 50% 45%, #3b4433, #121611 75%); }
 .bt-stage { position: absolute; inset: 0; display: grid; place-items: center; overflow: auto; }

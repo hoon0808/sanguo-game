@@ -85,8 +85,13 @@ SG.UI.tactical = function (atk, def) {
       var vb = { x: 0, y: 0, w: W, h: H };
       var cw = stage.clientWidth, ch = stage.clientHeight;
       if (!(SG.UI.isPortrait && SG.UI.isPortrait()) && cw > 50 && ch > 50) {
-        var A = cw / ch, a = W / H;
-        if (A > a) { vb.w = H * A; vb.x = -(vb.w - W) / 2; } else { vb.h = W / A; vb.y = -(vb.h - H) / 2; }
+        // 육각 칸이 있는 곳만 꼭 맞게 잡아 칸을 크게 (위·아래는 부대 그림·병력 표시가 들어갈 만큼만 남김)
+        var p0 = SG.UI.hexXY(0, 0), p1 = SG.UI.hexXY(SG.T.COLS - 1, 1), p2 = SG.UI.hexXY(0, SG.T.ROWS - 1);
+        var core = { x: p0.x - R * 0.9, y: p0.y - R * 1.15, w: 0, h: 0 };
+        core.w = p1.x + R * 0.9 - core.x; core.h = p2.y + R * 1.35 - core.y;
+        var A = cw / ch, a = core.w / core.h;
+        vb = { x: core.x, y: core.y, w: core.w, h: core.h };
+        if (A > a) { vb.w = core.h * A; vb.x = core.x - (vb.w - core.w) / 2; } else { vb.h = core.w / A; vb.y = core.y - (vb.h - core.h) / 2; }
       }
       vbNow = vb;
       svgEl.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);

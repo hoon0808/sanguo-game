@@ -2,7 +2,7 @@
 var SG = SG || {};
 
 SG.UI.HEX = 32; // 육각형 반지름(px)
-SG.UI.UNIT_SCALE = 1.4; // 부대 그림 크기 (칸에 견줘)
+SG.UI.UNIT_SCALE = 1.1; // 부대 그림 크기 (칸에 견줘)
 
 SG.UI.hexXY = function (c, r) {
   var R = SG.UI.HEX;
@@ -194,8 +194,8 @@ SG.UI.tactical = function (atk, def) {
         var p = SG.UI.hexXY(u.c, u.r);
         var g = S2('g', { transform: 'translate(' + p.x + ',' + p.y + ')' }, gUnits);
         var inner = S2('g', { class: 'unit' + ((u.done && u.side === B.side) ? ' spent' : '') + (st.sel === u ? ' selected' : '') + (u.side === me ? ' mine' : ' foe') }, g);
-        g.style.cursor = 'pointer';
-        g.addEventListener('click', function () { onHex(u.c, u.r); });
+        // 부대 그림은 칸보다 커서 이웃 칸을 덮는다 → 그림은 누름을 받지 않고, 누름은 아래 육각 칸이 받는다 (그 칸 = 부대 칸)
+        g.style.pointerEvents = 'none';
         if (st.lunge && st.lunge.id === u.id) { inner.classList.add('lunge'); inner.style.setProperty('--lx', st.lunge.dx + 'px'); inner.style.setProperty('--ly', st.lunge.dy + 'px'); }
         if (st.hit && st.hit[u.id]) inner.classList.add('hit');
         // 부대: 병종 그림(步 창방패·騎 기병·弓 궁병, img/unit) + 세력 색 땅 + 깃발 + 장수 얼굴 + 병력 막대
@@ -204,7 +204,7 @@ SG.UI.tactical = function (atk, def) {
         var gd = S2('ellipse', { cx: 0, cy: rr - 4, rx: rr * 0.82, ry: 7, class: 'unit-ground' }, inner);
         gd.style.fill = fcol[u.side];
         if (st.sel === u) S2('circle', { r: rr + 4, class: 'unit-sel' }, inner);
-        // 병종 그림은 칸보다 조금 크게 (위쪽으로 솟게) 그린다 (2026-10-24: 1.4배)
+        // 병종 그림은 칸보다 조금 크게 (위쪽으로 솟게) 그린다 (2026-10-24: 1.4배 → 2026-10-27: 1.1배, 이웃 칸을 덜 가리게)
         var UA = { inf: 218 / 200, cav: 166 / 200, arc: 205 / 200 }, uw = (u.t === 'cav' ? 64 : 56) * SG.UI.UNIT_SCALE, uh = uw * (UA[u.t] || 1);
         var face = u.side === 'atk' ? 1 : -1; // 공격군은 오른쪽(성 쪽), 수비군은 왼쪽을 본다
         var sg = S2('g', { transform: 'scale(' + face + ',1)' }, inner);

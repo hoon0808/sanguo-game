@@ -141,6 +141,17 @@ html.compact .bt-dlg { padding: 4px 10px; gap: 10px; }
 html.compact .bd-face .pt { width: 44px !important; height: 44px !important; }
 html.compact .bd-who { font-size: 13px; padding: 1px 8px; }
 html.compact .bd-t { font-size: 14px; min-height: 0; }
+/* 폰 가로: 대사창을 오른쪽 칸 아래로 옮겨 전장이 위아래를 다 쓰게 한다 (칸이 약 20% 커짐) */
+html.compact:not(.portrait) .bt { grid-template-rows: 40px 1fr auto; }
+html.compact:not(.portrait) .bt .field-area { grid-row: 2 / 4; grid-column: 1; }
+html.compact:not(.portrait) .bt .bt-side { grid-row: 2 !important; min-height: 0; }
+html.compact:not(.portrait) .bt-dlg { grid-row: 3; grid-column: 2; align-items: flex-start; gap: 6px; padding: 5px 6px 6px; border-left: 2px solid var(--brz); }
+html.compact:not(.portrait) .bt-dlg .bd-face .pt { width: 34px !important; height: 34px !important; }
+html.compact:not(.portrait) .bt-dlg .bd-body { gap: 3px; }
+html.compact:not(.portrait) .bt-dlg .bd-who { font-size: 12px; padding: 0 6px; max-width: calc(100% - 40px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: block; }
+html.compact:not(.portrait) .bt-dlg .bd-who small { margin-left: 6px; }
+html.compact:not(.portrait) .bt-dlg .bd-t { font-size: 12px; line-height: 1.45; max-height: calc(12px * 1.45 * 3); overflow-y: auto; }
+html.compact:not(.portrait) .bt-dlg .bd-hist { position: absolute; top: 4px; right: 5px; min-height: 22px; padding: 1px 7px; font-size: 11px; }
 html.compact .intro { zoom: .6; }
 html.compact .duel { zoom: .6; }
 html.compact .bt-stamp { zoom: .6; }
@@ -242,6 +253,7 @@ html.compact .ld-empty span { font-size: 12px; }
   html.compact .modal-f .btn { min-height: 32px; padding: 4px 12px; }
   html.compact .modal.scene .hall, html.compact .modal.scene .cmd-scene, html.compact .modal.scene .field-scene { zoom: .5; height: calc((100dvh - 84px) / .5); }
   html.compact .bt { grid-template-rows: 38px 1fr 50px; }
+  html.compact:not(.portrait) .bt { grid-template-rows: 36px 1fr auto; }
   html.compact .bd-face .pt { width: 38px !important; height: 38px !important; }
   html.compact .bd-t { font-size: 13px; }
   html.compact .cb { height: 84px; }
